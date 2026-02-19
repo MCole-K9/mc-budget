@@ -56,19 +56,23 @@ PUBLIC_POCKETBASE_URL=http://127.0.0.1:8090
 
 ### 3. Set Up PocketBase
 
-1. Download and run PocketBase:
+1. Copy the migrations folder to your PocketBase directory:
+   ```bash
+   cp -r pb_migrations /path/to/pocketbase/
+   ```
+
+2. Run PocketBase (migrations apply automatically):
    ```bash
    ./pocketbase serve
    ```
 
-2. Open the admin UI at `http://127.0.0.1:8090/_/`
+3. Open the admin UI at `http://127.0.0.1:8090/_/` and create an admin account
 
-3. Import the schema from `pocketbase-schema.json` or manually create collections:
-
-   **Collections:**
+   The migrations create:
    - `presets` - Budget templates (public read)
    - `wallets` - User wallets (user-scoped)
    - `transactions` - Financial transactions (wallet-scoped)
+   - Default budget presets (50/30/20, Zero-Based, Envelope)
 
 ### 4. Run Development Server
 

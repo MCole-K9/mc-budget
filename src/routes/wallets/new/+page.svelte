@@ -23,7 +23,7 @@
 	let error = $state('');
 
 	// Load presets using experimental async
-	const presetsPromise = getPresets();
+	const presets = await getPresets();
 
 	const currencyOptions = [
 		{ value: 'USD', label: 'USD - US Dollar' },
@@ -111,21 +111,11 @@
 						Choose a budget template to get started, or create a custom budget.
 					</p>
 
-					{#await presetsPromise}
-						<div class="flex justify-center py-12">
-							<span class="loading loading-spinner loading-lg"></span>
-						</div>
-					{:then presets}
-						<BudgetPresetSelector
-							{presets}
-							selected={selectedPresetId}
-							onselect={handlePresetSelect}
-						/>
-					{:catch err}
-						<Alert type="error">
-							{#snippet children()}{err.message}{/snippet}
-						</Alert>
-					{/await}
+					<BudgetPresetSelector
+						{presets}
+						selected={selectedPresetId}
+						onselect={handlePresetSelect}
+					/>
 
 					<div class="divider">OR</div>
 

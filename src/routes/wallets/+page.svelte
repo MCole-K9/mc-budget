@@ -4,10 +4,8 @@
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import WalletCard from '$lib/components/WalletCard.svelte';
 	import Button from '$lib/components/Button.svelte';
-	import Alert from '$lib/components/Alert.svelte';
 
-	// Using experimental async - data loads automatically
-	const walletsPromise = getWallets();
+	const wallets = await getWallets();
 </script>
 
 <svelte:head>
@@ -24,30 +22,20 @@
 				</a>
 			</div>
 
-			{#await walletsPromise}
-				<div class="flex justify-center py-12">
-					<span class="loading loading-spinner loading-lg"></span>
+			{#if wallets.length === 0}
+				<div class="text-center py-12">
+					<p class="text-base-content/70 mb-4">You don't have any wallets yet</p>
+					<a href="/wallets/new">
+						<Button variant="primary">Create Your First Wallet</Button>
+					</a>
 				</div>
-			{:then wallets}
-				{#if wallets.length === 0}
-					<div class="text-center py-12">
-						<p class="text-base-content/70 mb-4">You don't have any wallets yet</p>
-						<a href="/wallets/new">
-							<Button variant="primary">Create Your First Wallet</Button>
-						</a>
-					</div>
-				{:else}
-					<div class="grid gap-4 md:grid-cols-2">
-						{#each wallets as wallet}
-							<WalletCard {wallet} onclick={() => goto(`/wallets/${wallet.id}`)} />
-						{/each}
-					</div>
-				{/if}
-			{:catch error}
-				<Alert type="error">
-					{#snippet children()}{error.message}{/snippet}
-				</Alert>
-			{/await}
+			{:else}
+				<div class="grid gap-4 md:grid-cols-2">
+					{#each wallets as wallet}
+						<WalletCard {wallet} onclick={() => goto(`/wallets/${wallet.id}`)} />
+					{/each}
+				</div>
+			{/if}
 		</div>
 	{/snippet}
 </AuthGuard>

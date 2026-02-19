@@ -4,10 +4,8 @@
 	import type { BudgetPreset } from '$lib/types/budget';
 	import Card from '$lib/components/Card.svelte';
 	import Button from '$lib/components/Button.svelte';
-	import Alert from '$lib/components/Alert.svelte';
 
-	// Using experimental async with prerendered remote function
-	const presetsPromise = getPresets();
+	const presets = await getPresets();
 
 	function usePreset(preset: BudgetPreset) {
 		goto('/wallets/new');
@@ -26,56 +24,46 @@
 		</p>
 	</div>
 
-	{#await presetsPromise}
-		<div class="flex justify-center py-12">
-			<span class="loading loading-spinner loading-lg"></span>
-		</div>
-	{:then presets}
-		<div class="grid gap-6 md:grid-cols-2">
-			{#each presets as preset}
-				<Card class="h-full">
-					{#snippet children()}
-						<h2 class="text-xl font-semibold">{preset.name}</h2>
-						<p class="text-base-content/70 mt-2">{preset.description}</p>
+	<div class="grid gap-6 md:grid-cols-2">
+		{#each presets as preset}
+			<Card class="h-full">
+				{#snippet children()}
+					<h2 class="text-xl font-semibold">{preset.name}</h2>
+					<p class="text-base-content/70 mt-2">{preset.description}</p>
 
-						<div class="mt-4">
-							<div class="flex h-4 rounded-full overflow-hidden bg-base-300">
-								{#each preset.categories as category}
-									<div
-										class="h-full"
-										style="width: {category.percentage}%; background-color: {category.color};"
-										title="{category.name}: {category.percentage}%"
-									></div>
-								{/each}
-							</div>
-
-							<div class="mt-3 space-y-1">
-								{#each preset.categories as category}
-									<div class="flex items-center justify-between text-sm">
-										<div class="flex items-center gap-2">
-											<span
-												class="w-3 h-3 rounded"
-												style="background-color: {category.color};"
-											></span>
-											<span>{category.name}</span>
-										</div>
-										<span class="font-medium">{category.percentage}%</span>
-									</div>
-								{/each}
-							</div>
+					<div class="mt-4">
+						<div class="flex h-4 rounded-full overflow-hidden bg-base-300">
+							{#each preset.categories as category}
+								<div
+									class="h-full"
+									style="width: {category.percentage}%; background-color: {category.color};"
+									title="{category.name}: {category.percentage}%"
+								></div>
+							{/each}
 						</div>
-					{/snippet}
-					{#snippet actions()}
-						<Button variant="primary" size="sm" onclick={() => usePreset(preset)}>
-							Use This Template
-						</Button>
-					{/snippet}
-				</Card>
-			{/each}
-		</div>
-	{:catch error}
-		<Alert type="error">
-			{#snippet children()}{error.message}{/snippet}
-		</Alert>
-	{/await}
+
+						<div class="mt-3 space-y-1">
+							{#each preset.categories as category}
+								<div class="flex items-center justify-between text-sm">
+									<div class="flex items-center gap-2">
+										<span
+											class="w-3 h-3 rounded"
+											style="background-color: {category.color};"
+										></span>
+										<span>{category.name}</span>
+									</div>
+									<span class="font-medium">{category.percentage}%</span>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/snippet}
+				{#snippet actions()}
+					<Button variant="primary" size="sm" onclick={() => usePreset(preset)}>
+						Use This Template
+					</Button>
+				{/snippet}
+			</Card>
+		{/each}
+	</div>
 </div>

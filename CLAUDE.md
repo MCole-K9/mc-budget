@@ -188,6 +188,43 @@ export const CreateWalletInputSchema = z.object({
 ### Event Handlers
 Use `onclick`, `onsubmit`, etc. (not `on:click`)
 
+## PocketBase
+
+### Migrations (Recommended)
+
+Use JavaScript migrations for schema management. This is PocketBase's recommended approach for version control.
+
+Reference: https://pocketbase.io/docs/js-migrations/
+
+**Migration files location:** `pb_migrations/`
+
+```javascript
+// pb_migrations/1_collections.js
+migrate((app) => {
+  const users = app.findCollectionByNameOrId("users");
+
+  const wallets = new Collection({
+    type: "base",
+    name: "wallets",
+    listRule: "@request.auth.id = user",
+    fields: [
+      { type: "relation", name: "user", required: true, collectionId: users.id, maxSelect: 1 },
+      { type: "text", name: "name", required: true, max: 100 },
+      { type: "number", name: "balance", required: true },
+      { type: "json", name: "categories", required: true }
+    ]
+  });
+  app.save(wallets);
+}, (app) => {
+  // Rollback
+});
+```
+
+**Key points:**
+- Look up collection IDs dynamically with `app.findCollectionByNameOrId("name")`
+- Migrations auto-run on `pocketbase serve`
+- Commit `pb_migrations/` to version control
+
 ## Important Files
 
 | File | Purpose |
@@ -197,7 +234,7 @@ Use `onclick`, `onsubmit`, etc. (not `on:click`)
 | `src/lib/*.remote.ts` | Remote functions |
 | `src/lib/server/db.ts` | Server-side PocketBase client |
 | `src/lib/stores/*.svelte.ts` | Reactive stores |
-| `pocketbase-schema.json` | Database schema |
+| `pb_migrations/` | PocketBase schema migrations |
 
 ## Remote Function Files
 
