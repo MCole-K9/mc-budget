@@ -16,7 +16,7 @@ export const login = form(LoginInputSchema, async (input) => {
 		.authWithPassword(input.email, input.password);
 
 	return {
-		user: UserSchema.parse(authData.record),
+		user: authData.record,
 		token: pb.authStore.token
 	};
 });
@@ -29,14 +29,18 @@ export const register = form(RegisterInputSchema, async (input) => {
 		email: input.email,
 		password: input.password,
 		passwordConfirm: input.passwordConfirm,
-		name: input.name
+		name: input.name || ''
+	}).catch(err => {
+		if (err.response?.data?.email?.code === 'validation_not_unique') {
+			throw new Error('An account with this email already exists');
+		}
+		throw new Error('Failed to create account');
 	});
 
-	// Auto-login after registration
 	await pb.collection('users').authWithPassword(input.email, input.password);
 
 	return {
-		user: UserSchema.parse(record),
+		user: record,
 		token: pb.authStore.token
 	};
 });
@@ -58,7 +62,7 @@ export const refreshAuth = command(async () => {
 	try {
 		const authData = await pb.collection('users').authRefresh();
 		return {
-			user: UserSchema.parse(authData.record),
+			user: authData.record,
 			token: pb.authStore.token
 		};
 	} catch {
@@ -79,7 +83,7 @@ export const updateProfile = command(
 		}
 
 		const record = await pb.collection('users').update(user.id, data);
-		return UserSchema.parse(record);
+		return record;
 	}
 );
 

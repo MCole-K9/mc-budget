@@ -113,15 +113,16 @@ export const BudgetPresetSchema = z.object({
 
 export type BudgetPreset = z.infer<typeof BudgetPresetSchema>;
 
-// User Schema
+// User Schema (matches PocketBase auth record)
 export const UserSchema = z.object({
 	id: z.string(),
 	email: z.string().email(),
-	name: z.string(),
-	avatar: z.string().optional(),
+	name: z.string().optional().default(''),
+	avatar: z.string().optional().default(''),
+	verified: z.boolean().optional(),
 	created: z.string(),
 	updated: z.string()
-});
+}).passthrough();
 
 export type User = z.infer<typeof UserSchema>;
 
