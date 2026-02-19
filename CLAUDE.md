@@ -96,39 +96,39 @@ export const createWallet = command(CreateWalletInputSchema, async (input) => {
 
 ### Async Components
 
-With `experimental.async: true`, components can use `{#await}` blocks directly:
+With `experimental.async: true`, use top-level `await` in the script block for main resources:
 
 ```svelte
 <script lang="ts">
   import { getWallets } from '$lib/wallets.remote';
 
-  const walletsPromise = getWallets();
+  // Top-level await - component suspends until resolved
+  const wallets = await getWallets();
 </script>
 
-{#await walletsPromise}
-  <span class="loading loading-spinner"></span>
-{:then wallets}
-  {#each wallets as wallet}
-    <WalletCard {wallet} />
-  {/each}
-{:catch error}
-  <Alert type="error">{error.message}</Alert>
-{/await}
+{#each wallets as wallet}
+  <WalletCard {wallet} />
+{/each}
 ```
 
-### Reactive Async with `$derived`
-
-For dynamic data that depends on reactive values:
+For secondary async operations or when you need loading/error states in the template, use `<svelte:boundary>`:
 
 ```svelte
-<script lang="ts">
-  import { page } from '$app/state';
-  import { getWallet } from '$lib/wallets.remote';
+<svelte:boundary>
+  {@const data = await fetchData()}
+  <div>{data.name}</div>
 
-  const walletId = $derived(page.params.id!);
-  const walletPromise = $derived(getWallet(walletId));
-</script>
+  {#snippet pending()}
+    <span class="loading loading-spinner"></span>
+  {/snippet}
+
+  {#snippet failed(error)}
+    <Alert type="error">{error instanceof Error ? error.message : 'Error'}</Alert>
+  {/snippet}
+</svelte:boundary>
 ```
+
+**Prefer top-level await in script** for main page resources - it's cleaner and the component simply suspends until data is ready.
 
 ## Zod v4 Schemas
 
