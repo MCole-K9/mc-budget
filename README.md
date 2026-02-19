@@ -1,6 +1,6 @@
 # MC Budget
 
-A personal budget management system built with SvelteKit, PocketBase, TailwindCSS v4, and DaisyUI v5.
+A personal budget management system built with SvelteKit, PocketBase, TailwindCSS v4, DaisyUI v5, and Zod v4.
 
 ## Features
 
@@ -10,11 +10,20 @@ A personal budget management system built with SvelteKit, PocketBase, TailwindCS
 - **Immutable Budgets**: Budget allocations are set at wallet creation and cannot be modified
 - **Dark/Light Mode**: Theme toggle with localStorage persistence
 - **User Authentication**: Secure login/registration via PocketBase
+- **Type-Safe API**: Remote functions with Zod schema validation
+
+## Experimental Features
+
+This project uses cutting-edge SvelteKit experimental features:
+
+- **Remote Functions** (`kit.experimental.remoteFunctions`) - Type-safe client-server communication
+- **Async Components** (`compilerOptions.experimental.async`) - Top-level await in components
 
 ## Tech Stack
 
 - **Frontend**: SvelteKit 2, Svelte 5 (runes)
 - **Styling**: TailwindCSS v4, DaisyUI v5
+- **Validation**: Zod v4
 - **Backend**: PocketBase
 - **Runtime**: Bun
 
@@ -72,47 +81,36 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 ## Project Structure
 
 ```
-src/
-├── lib/
-│   ├── api/              # PocketBase API utilities
-│   │   ├── auth.ts       # Authentication functions
-│   │   ├── pocketbase.ts # PocketBase client
-│   │   ├── presets.ts    # Budget preset operations
-│   │   ├── transactions.ts
-│   │   └── wallets.ts
-│   ├── components/       # Svelte components
-│   │   ├── Alert.svelte
-│   │   ├── AuthGuard.svelte
-│   │   ├── BudgetCategoryInput.svelte
-│   │   ├── BudgetCategoryList.svelte
-│   │   ├── BudgetPresetSelector.svelte
-│   │   ├── Button.svelte
-│   │   ├── Card.svelte
-│   │   ├── Input.svelte
-│   │   ├── Modal.svelte
-│   │   ├── Select.svelte
-│   │   ├── ThemeToggle.svelte
-│   │   ├── TransactionForm.svelte
-│   │   ├── TransactionList.svelte
-│   │   └── WalletCard.svelte
-│   ├── stores/           # Svelte 5 reactive stores
-│   │   ├── auth.svelte.ts
-│   │   └── theme.svelte.ts
-│   ├── types/            # TypeScript definitions
-│   │   └── budget.ts
-│   └── validation/       # Input validation
-│       └── budget.ts
-└── routes/
-    ├── +layout.svelte    # App shell with navigation
-    ├── +page.svelte      # Home/dashboard
-    ├── auth/
-    │   ├── login/
-    │   └── register/
-    ├── presets/          # Browse budget templates
-    └── wallets/
-        ├── +page.svelte  # Wallet list
-        ├── new/          # Create wallet wizard
-        └── [id]/         # Wallet detail + transactions
+src/lib/
+├── *.remote.ts       # Remote functions (query, command, form, prerender)
+├── schemas/          # Zod v4 validation schemas
+│   └── budget.ts     # All type schemas
+├── server/           # Server-only modules
+│   └── db.ts         # PocketBase client
+├── components/       # Svelte 5 components
+├── stores/           # Reactive stores (.svelte.ts)
+├── types/            # Type re-exports
+└── validation/       # Validation helpers
+```
+
+## Remote Functions
+
+This project uses SvelteKit's experimental remote functions for type-safe client-server communication:
+
+```typescript
+// src/lib/wallets.remote.ts
+import { z } from 'zod';
+import { query, command } from '$app/server';
+
+// Query with Zod schema validation
+export const getWallet = query(z.string(), async (id) => {
+  return await db.collection('wallets').getOne(id);
+});
+
+// Command for mutations
+export const createWallet = command(CreateWalletSchema, async (input) => {
+  return await db.collection('wallets').create(input);
+});
 ```
 
 ## Budget Presets
@@ -150,13 +148,15 @@ bun run test:e2e   # Run E2E tests
 
 ## Key Design Decisions
 
-1. **Immutable Budgets**: Once a wallet is created, its budget categories cannot be changed. This enforces financial discipline and simplifies the data model.
+1. **Immutable Budgets**: Once a wallet is created, its budget categories cannot be changed.
 
-2. **Categories on Wallet**: Budget categories are stored as JSON on the wallet record (not as relations). This ensures immutability and simplifies queries.
+2. **Remote Functions**: Server-side logic runs via remote functions, providing type safety and automatic validation.
 
-3. **100% Validation**: Client and server validate that category percentages total exactly 100%.
+3. **Zod v4 Schemas**: All input validation uses Zod schemas, ensuring consistent validation on client and server.
 
-4. **Default Presets**: Three popular budget methods are available without database setup.
+4. **Async Components**: Components use top-level await for cleaner data loading patterns.
+
+5. **100% Validation**: Category percentages must total exactly 100%.
 
 ## License
 

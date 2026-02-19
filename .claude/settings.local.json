@@ -3,7 +3,8 @@
     "allow": [
       "mcp__svelte__get-documentation",
       "mcp__svelte__svelte-autofixer",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "mcp__svelte__list-sections"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -2,7 +2,11 @@
 
 ## Project Overview
 
-MC Budget is a personal finance application for managing wallets with fixed budget allocations. Built with SvelteKit 2, Svelte 5 (runes), TailwindCSS v4, DaisyUI v5, and PocketBase.
+MC Budget is a personal finance application for managing wallets with fixed budget allocations. Built with SvelteKit 2, Svelte 5 (runes), TailwindCSS v4, DaisyUI v5, PocketBase, and Zod v4.
+
+**This project uses experimental Svelte/SvelteKit features:**
+- `compilerOptions.experimental.async` - Async components with top-level await
+- `kit.experimental.remoteFunctions` - Type-safe client-server communication with Zod schemas
 
 ## Key Concepts
 
@@ -15,17 +19,146 @@ MC Budget is a personal finance application for managing wallets with fixed budg
 ### Architecture
 ```
 src/lib/
-├── api/          # PocketBase CRUD operations
+├── *.remote.ts   # Remote functions (server-side, called from client)
+├── schemas/      # Zod schemas for validation
+├── server/       # Server-only modules (db client)
 ├── components/   # Reusable Svelte 5 components
 ├── stores/       # Svelte 5 reactive stores (.svelte.ts)
-├── types/        # TypeScript interfaces
-└── validation/   # Input validation functions
+├── types/        # TypeScript type re-exports
+└── validation/   # Validation helper functions
 ```
+
+## Experimental Features
+
+### Remote Functions (`*.remote.ts`)
+
+Remote functions run on the server but can be called from client components. They provide type-safe client-server communication using Zod schemas.
+
+**Four types of remote functions:**
+- `query` - Read data (GET requests, cacheable)
+- `command` - Mutate data (POST requests)
+- `form` - Form submissions with progressive enhancement
+- `prerender` - Static data computed at build time
+
+**Syntax with Zod schemas:**
+```typescript
+// src/lib/wallets.remote.ts
+import { z } from 'zod';
+import { query, command } from '$app/server';
+import { WalletSchema, CreateWalletInputSchema } from '$lib/schemas/budget';
+
+// No arguments - just async function
+export const getWallets = query(async () => {
+  return await db.getAll();
+});
+
+// With argument - pass Zod schema first
+export const getWallet = query(z.string(), async (id) => {
+  return await db.getOne(id);
+});
+
+// Command with complex input
+export const createWallet = command(CreateWalletInputSchema, async (input) => {
+  return await db.create(input);
+});
+```
+
+### Form Remote Functions
+
+`form` returns attributes to spread on a `<form>` element:
+
+```svelte
+<script lang="ts">
+  import { login } from '$lib/auth.remote';
+
+  const loginForm = login;
+
+  $effect(() => {
+    if (loginForm.result?.user) {
+      goto('/dashboard');
+    }
+  });
+</script>
+
+<form {...loginForm}>
+  <input {...loginForm.fields.email.as('email')} />
+  {#each loginForm.fields.email.issues() as issue}
+    <span class="error">{issue.message}</span>
+  {/each}
+
+  <input {...loginForm.fields.password.as('password')} />
+
+  <button type="submit" disabled={!!loginForm.pending}>
+    Login
+  </button>
+</form>
+```
+
+### Async Components
+
+With `experimental.async: true`, components can use `{#await}` blocks directly:
+
+```svelte
+<script lang="ts">
+  import { getWallets } from '$lib/wallets.remote';
+
+  const walletsPromise = getWallets();
+</script>
+
+{#await walletsPromise}
+  <span class="loading loading-spinner"></span>
+{:then wallets}
+  {#each wallets as wallet}
+    <WalletCard {wallet} />
+  {/each}
+{:catch error}
+  <Alert type="error">{error.message}</Alert>
+{/await}
+```
+
+### Reactive Async with `$derived`
+
+For dynamic data that depends on reactive values:
+
+```svelte
+<script lang="ts">
+  import { page } from '$app/state';
+  import { getWallet } from '$lib/wallets.remote';
+
+  const walletId = $derived(page.params.id!);
+  const walletPromise = $derived(getWallet(walletId));
+</script>
+```
+
+## Zod v4 Schemas
+
+All validation uses Zod v4 schemas defined in `src/lib/schemas/budget.ts`:
+
+```typescript
+import { z } from 'zod';
+
+export const BudgetCategorySchema = z.object({
+  name: z.string().min(1).max(100),
+  percentage: z.number().min(0).max(100),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/)
+});
+
+export const CreateWalletInputSchema = z.object({
+  name: z.string().min(1).max(100),
+  balance: z.number().min(0),
+  currency: z.string().length(3).regex(/^[A-Z]{3}$/),
+  categories: z.array(BudgetCategorySchema)
+    .refine(cats => Math.abs(cats.reduce((s, c) => s + c.percentage, 0) - 100) < 0.01)
+});
+```
+
+**Zod v4 API notes:**
+- Use `result.error.issues` (not `errors`) for validation errors
+- Types are inferred with `z.infer<typeof Schema>`
 
 ## Coding Conventions
 
 ### Svelte 5 Runes
-This project uses Svelte 5 runes exclusively:
 - `$state()` for reactive state
 - `$derived()` for computed values
 - `$effect()` for side effects
@@ -44,43 +177,36 @@ This project uses Svelte 5 runes exclusively:
 ```
 
 ### Snippets (not slots)
-Use Svelte 5 snippets instead of slots:
 ```svelte
-<!-- Parent -->
 <Card>
   {#snippet children()}
     Content here
   {/snippet}
 </Card>
-
-<!-- Card.svelte -->
-<script lang="ts">
-  import type { Snippet } from 'svelte';
-  interface Props {
-    children: Snippet;
-  }
-  let { children }: Props = $props();
-</script>
-<div>{@render children()}</div>
 ```
 
 ### Event Handlers
-Use `onclick`, `onsubmit`, etc. (not `on:click`):
-```svelte
-<button onclick={handleClick}>Click</button>
-<form onsubmit={handleSubmit}>...</form>
-```
+Use `onclick`, `onsubmit`, etc. (not `on:click`)
 
 ## Important Files
 
 | File | Purpose |
 |------|---------|
-| `src/lib/types/budget.ts` | All TypeScript interfaces |
-| `src/lib/validation/budget.ts` | Validation functions (categories must = 100%) |
-| `src/lib/api/presets.ts` | Default budget templates (50/30/20, etc.) |
-| `src/lib/stores/auth.svelte.ts` | Authentication state |
-| `src/lib/stores/theme.svelte.ts` | Dark/light mode |
-| `pocketbase-schema.json` | Database collection definitions |
+| `svelte.config.js` | Experimental features enabled |
+| `src/lib/schemas/budget.ts` | All Zod schemas |
+| `src/lib/*.remote.ts` | Remote functions |
+| `src/lib/server/db.ts` | Server-side PocketBase client |
+| `src/lib/stores/*.svelte.ts` | Reactive stores |
+| `pocketbase-schema.json` | Database schema |
+
+## Remote Function Files
+
+| File | Functions |
+|------|-----------|
+| `wallets.remote.ts` | getWallets, getWallet, createWallet, deleteWallet |
+| `transactions.remote.ts` | getTransactions, createTransaction, deleteTransaction |
+| `presets.remote.ts` | getPresets (prerendered), getPreset |
+| `auth.remote.ts` | login (form), register (form), logout, refreshAuth |
 
 ## Validation Rules
 
@@ -102,32 +228,12 @@ Use `onclick`, `onsubmit`, etc. (not `on:click`):
 
 ## DaisyUI Components
 
-Use DaisyUI classes for UI consistency:
-- Buttons: `btn btn-primary`, `btn btn-ghost`, `btn-sm`, `btn-lg`
+Use DaisyUI classes:
+- Buttons: `btn btn-primary`, `btn-ghost`, `btn-sm`
 - Cards: `card`, `card-body`, `card-title`
 - Forms: `input input-bordered`, `select select-bordered`
 - Alerts: `alert alert-error`, `alert-success`
 - Loading: `loading loading-spinner`
-
-## Common Tasks
-
-### Adding a New Component
-1. Create in `src/lib/components/`
-2. Use Props interface pattern
-3. Run through svelte-autofixer
-4. Use DaisyUI classes for styling
-
-### Adding API Functionality
-1. Add types to `src/lib/types/budget.ts`
-2. Add validation to `src/lib/validation/budget.ts`
-3. Create API functions in `src/lib/api/`
-4. API functions should validate before PocketBase calls
-
-### Adding a New Route
-1. Create directory in `src/routes/`
-2. Add `+page.svelte` and `+page.server.ts`
-3. Use `AuthGuard` component for protected routes
-4. Load data client-side via API utilities
 
 ## Testing
 
@@ -145,16 +251,14 @@ bun run test:e2e   # Playwright E2E tests
 
 ## Svelte MCP Tools
 
-You have access to the Svelte MCP server with comprehensive Svelte 5 and SvelteKit documentation.
-
 ### 1. list-sections
-Use FIRST to discover available documentation sections. Returns structured list with titles, use_cases, and paths.
+Use FIRST to discover available documentation sections.
 
 ### 2. get-documentation
-Retrieves full documentation for specific sections. After list-sections, fetch ALL relevant sections for the user's task.
+Retrieves full documentation for specific sections.
 
 ### 3. svelte-autofixer
-Analyzes Svelte code for issues. MUST use when writing Svelte components. Keep calling until no issues remain.
+Analyzes Svelte code for issues. MUST use when writing Svelte components.
 
 ### 4. playground-link
-Generates Svelte Playground links. Only use after user confirmation and NEVER if code was written to project files.
+Generates Svelte Playground links. Only use after user confirmation.

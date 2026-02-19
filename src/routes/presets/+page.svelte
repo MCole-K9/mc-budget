@@ -1,32 +1,15 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { getPresets } from '$lib/api/presets';
+	import { getPresets } from '$lib/presets.remote';
 	import type { BudgetPreset } from '$lib/types/budget';
 	import Card from '$lib/components/Card.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Alert from '$lib/components/Alert.svelte';
 
-	let presets = $state<BudgetPreset[]>([]);
-	let loading = $state(true);
-	let error = $state('');
-
-	$effect(() => {
-		loadPresets();
-	});
-
-	async function loadPresets() {
-		loading = true;
-		try {
-			presets = await getPresets();
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load presets';
-		} finally {
-			loading = false;
-		}
-	}
+	// Using experimental async with prerendered remote function
+	const presetsPromise = getPresets();
 
 	function usePreset(preset: BudgetPreset) {
-		// Navigate to wallet creation with preset pre-selected
 		goto('/wallets/new');
 	}
 </script>
@@ -43,15 +26,11 @@
 		</p>
 	</div>
 
-	{#if error}
-		<Alert type="error">
-			{#snippet children()}{error}{/snippet}
-		</Alert>
-	{:else if loading}
+	{#await presetsPromise}
 		<div class="flex justify-center py-12">
 			<span class="loading loading-spinner loading-lg"></span>
 		</div>
-	{:else}
+	{:then presets}
 		<div class="grid gap-6 md:grid-cols-2">
 			{#each presets as preset}
 				<Card class="h-full">
@@ -94,5 +73,9 @@
 				</Card>
 			{/each}
 		</div>
-	{/if}
+	{:catch error}
+		<Alert type="error">
+			{#snippet children()}{error.message}{/snippet}
+		</Alert>
+	{/await}
 </div>

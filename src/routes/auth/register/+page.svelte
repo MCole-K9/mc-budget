@@ -1,42 +1,25 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import { register } from '$lib/api/auth';
+	import { register } from '$lib/auth.remote';
 	import { auth } from '$lib/stores/auth.svelte';
 	import Input from '$lib/components/Input.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import Alert from '$lib/components/Alert.svelte';
 
-	let name = $state('');
-	let email = $state('');
-	let password = $state('');
-	let passwordConfirm = $state('');
-	let loading = $state(false);
+	// Remote form returns attributes to spread on form element
+	const registerForm = register;
+
+	// Track form state
 	let error = $state('');
 
-	const passwordsMatch = $derived(password === passwordConfirm);
-
-	async function handleSubmit(e: Event) {
-		e.preventDefault();
-		error = '';
-
-		if (!passwordsMatch) {
-			error = 'Passwords do not match';
-			return;
+	// Check for successful registration result
+	$effect(() => {
+		if (registerForm.result?.user) {
+			auth.setUser(registerForm.result.user);
+			goto('/wallets');
 		}
-
-		loading = true;
-
-		try {
-			const user = await register({ name, email, password, passwordConfirm });
-			auth.setUser(user);
-			await goto('/wallets');
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Registration failed';
-		} finally {
-			loading = false;
-		}
-	}
+	});
 </script>
 
 <svelte:head>
@@ -52,41 +35,78 @@
 				</Alert>
 			{/if}
 
-			<form onsubmit={handleSubmit} class="space-y-4 mt-4">
-				<Input
-					type="text"
-					label="Name"
-					bind:value={name}
-					placeholder="Your name"
-					required
-				/>
+			{#each registerForm.fields.allIssues() as issue}
+				<Alert type="error">
+					{#snippet children()}{issue.message}{/snippet}
+				</Alert>
+			{/each}
 
-				<Input
-					type="email"
-					label="Email"
-					bind:value={email}
-					placeholder="you@example.com"
-					required
-				/>
+			<form {...registerForm} class="space-y-4 mt-4">
+				<div class="form-control w-full">
+					<label class="label">
+						<span class="label-text">Name</span>
+					</label>
+					<input
+						{...registerForm.fields.name.as('text')}
+						class="input input-bordered w-full"
+						placeholder="Your name"
+					/>
+					{#each registerForm.fields.name.issues() as issue}
+						<label class="label">
+							<span class="label-text-alt text-error">{issue.message}</span>
+						</label>
+					{/each}
+				</div>
 
-				<Input
-					type="password"
-					label="Password"
-					bind:value={password}
-					placeholder="Create a password"
-					required
-				/>
+				<div class="form-control w-full">
+					<label class="label">
+						<span class="label-text">Email</span>
+					</label>
+					<input
+						{...registerForm.fields.email.as('email')}
+						class="input input-bordered w-full"
+						placeholder="you@example.com"
+					/>
+					{#each registerForm.fields.email.issues() as issue}
+						<label class="label">
+							<span class="label-text-alt text-error">{issue.message}</span>
+						</label>
+					{/each}
+				</div>
 
-				<Input
-					type="password"
-					label="Confirm Password"
-					bind:value={passwordConfirm}
-					placeholder="Confirm your password"
-					error={passwordConfirm && !passwordsMatch ? 'Passwords do not match' : ''}
-					required
-				/>
+				<div class="form-control w-full">
+					<label class="label">
+						<span class="label-text">Password</span>
+					</label>
+					<input
+						{...registerForm.fields.password.as('password')}
+						class="input input-bordered w-full"
+						placeholder="Create a password"
+					/>
+					{#each registerForm.fields.password.issues() as issue}
+						<label class="label">
+							<span class="label-text-alt text-error">{issue.message}</span>
+						</label>
+					{/each}
+				</div>
 
-				<Button type="submit" variant="primary" class="w-full" {loading}>
+				<div class="form-control w-full">
+					<label class="label">
+						<span class="label-text">Confirm Password</span>
+					</label>
+					<input
+						{...registerForm.fields.passwordConfirm.as('password')}
+						class="input input-bordered w-full"
+						placeholder="Confirm your password"
+					/>
+					{#each registerForm.fields.passwordConfirm.issues() as issue}
+						<label class="label">
+							<span class="label-text-alt text-error">{issue.message}</span>
+						</label>
+					{/each}
+				</div>
+
+				<Button type="submit" variant="primary" class="w-full" loading={!!registerForm.pending}>
 					Create Account
 				</Button>
 			</form>

@@ -1,69 +1,27 @@
-export interface BudgetCategory {
-	name: string;
-	percentage: number;
-	color: string;
-}
+// Re-export all types from Zod schemas for backwards compatibility
+export type {
+	BudgetCategory,
+	BudgetPreset,
+	Wallet,
+	Transaction,
+	CreateWalletInput,
+	CreateTransactionInput,
+	User,
+	LoginInput,
+	RegisterInput
+} from '$lib/schemas/budget';
 
-export interface BudgetPreset {
-	id: string;
-	name: string;
-	description: string;
-	categories: BudgetCategory[];
-}
-
-export interface Wallet {
-	id: string;
-	user: string;
-	name: string;
-	balance: number;
-	currency: string;
-	categories: BudgetCategory[];
-	created: string;
-	updated: string;
-}
-
-export interface Transaction {
-	id: string;
-	wallet: string;
-	category: string;
-	amount: number;
-	description: string;
-	date: string;
-	created: string;
-}
-
-export interface CreateWalletInput {
-	name: string;
-	balance: number;
-	currency: string;
-	categories: BudgetCategory[];
-}
-
-export interface CreateTransactionInput {
-	wallet: string;
-	category: string;
-	amount: number;
-	description?: string;
-	date: string;
-}
-
-export interface User {
-	id: string;
-	email: string;
-	name: string;
-	avatar?: string;
-	created: string;
-	updated: string;
-}
-
-export interface LoginInput {
-	email: string;
-	password: string;
-}
-
-export interface RegisterInput {
-	email: string;
-	password: string;
-	passwordConfirm: string;
-	name: string;
-}
+// Re-export schemas for validation
+export {
+	BudgetCategorySchema,
+	BudgetCategoriesSchema,
+	BudgetPresetSchema,
+	WalletSchema,
+	TransactionSchema,
+	CreateWalletInputSchema,
+	CreateTransactionInputSchema,
+	UserSchema,
+	LoginInputSchema,
+	RegisterInputSchema,
+	validateTransactionCategory
+} from '$lib/schemas/budget';

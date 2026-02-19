@@ -1,8 +1,7 @@
 <script lang="ts">
-	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
-	import { createWallet } from '$lib/api/wallets';
-	import { getPresets } from '$lib/api/presets';
+	import { createWallet } from '$lib/wallets.remote';
+	import { getPresets } from '$lib/presets.remote';
 	import type { BudgetPreset, BudgetCategory } from '$lib/types/budget';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import Input from '$lib/components/Input.svelte';
@@ -14,8 +13,6 @@
 	import BudgetCategoryList from '$lib/components/BudgetCategoryList.svelte';
 	import { validateCategories } from '$lib/validation/budget';
 
-	let { data }: { data: PageData } = $props();
-
 	let step = $state<'preset' | 'customize' | 'details'>('preset');
 	let name = $state('');
 	let balance = $state<number | ''>(0);
@@ -24,7 +21,9 @@
 	let selectedPresetId = $state<string | undefined>(undefined);
 	let loading = $state(false);
 	let error = $state('');
-	let presets = $state<BudgetPreset[]>([]);
+
+	// Load presets using experimental async
+	const presetsPromise = getPresets();
 
 	const currencyOptions = [
 		{ value: 'USD', label: 'USD - US Dollar' },
@@ -36,18 +35,6 @@
 	];
 
 	const categoriesValid = $derived(validateCategories(categories).valid);
-
-	$effect(() => {
-		loadPresets();
-	});
-
-	async function loadPresets() {
-		try {
-			presets = await getPresets();
-		} catch (err) {
-			error = 'Failed to load presets';
-		}
-	}
 
 	function handlePresetSelect(preset: BudgetPreset) {
 		selectedPresetId = preset.id;
@@ -105,15 +92,17 @@
 
 			<!-- Progress Steps -->
 			<ul class="steps steps-horizontal w-full mb-8">
-				<li class="step {step === 'preset' || step === 'customize' || step === 'details' ? 'step-primary' : ''}">
+				<li
+					class="step {step === 'preset' || step === 'customize' || step === 'details'
+						? 'step-primary'
+						: ''}"
+				>
 					Choose Template
 				</li>
 				<li class="step {step === 'customize' || step === 'details' ? 'step-primary' : ''}">
 					Customize Budget
 				</li>
-				<li class="step {step === 'details' ? 'step-primary' : ''}">
-					Wallet Details
-				</li>
+				<li class="step {step === 'details' ? 'step-primary' : ''}">Wallet Details</li>
 			</ul>
 
 			{#if step === 'preset'}
@@ -122,19 +111,25 @@
 						Choose a budget template to get started, or create a custom budget.
 					</p>
 
-					<BudgetPresetSelector
-						{presets}
-						selected={selectedPresetId}
-						onselect={handlePresetSelect}
-					/>
+					{#await presetsPromise}
+						<div class="flex justify-center py-12">
+							<span class="loading loading-spinner loading-lg"></span>
+						</div>
+					{:then presets}
+						<BudgetPresetSelector
+							{presets}
+							selected={selectedPresetId}
+							onselect={handlePresetSelect}
+						/>
+					{:catch err}
+						<Alert type="error">
+							{#snippet children()}{err.message}{/snippet}
+						</Alert>
+					{/await}
 
 					<div class="divider">OR</div>
 
-					<button
-						type="button"
-						class="btn btn-outline w-full"
-						onclick={handleCustomBudget}
-					>
+					<button type="button" class="btn btn-outline w-full" onclick={handleCustomBudget}>
 						Create Custom Budget
 					</button>
 				</div>
@@ -145,15 +140,10 @@
 							Adjust categories and percentages. Total must equal 100%.
 						</p>
 
-						<BudgetCategoryList
-							bind:categories
-							editable
-						/>
+						<BudgetCategoryList bind:categories editable />
 
 						<div class="flex gap-2 mt-6">
-							<Button variant="ghost" onclick={() => (step = 'preset')}>
-								Back
-							</Button>
+							<Button variant="ghost" onclick={() => (step = 'preset')}>Back</Button>
 							<Button
 								variant="primary"
 								class="flex-1"
@@ -209,9 +199,7 @@
 							</div>
 
 							<div class="flex gap-2 mt-6">
-								<Button variant="ghost" onclick={() => (step = 'customize')}>
-									Back
-								</Button>
+								<Button variant="ghost" onclick={() => (step = 'customize')}>Back</Button>
 								<Button type="submit" variant="primary" class="flex-1" {loading}>
 									Create Wallet
 								</Button>

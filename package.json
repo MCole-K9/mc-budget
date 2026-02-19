@@ -43,6 +43,7 @@
 	},
 	"dependencies": {
 		"daisyui": "5",
-		"pocketbase": "^0.26.8"
+		"pocketbase": "^0.26.8",
+		"zod": "4"
 	}
 }

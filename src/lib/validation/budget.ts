@@ -1,144 +1,118 @@
-import type {
-	BudgetCategory,
-	CreateWalletInput,
-	CreateTransactionInput,
-	Wallet
-} from '$lib/types/budget';
+import { z } from 'zod';
+import {
+	BudgetCategoriesSchema,
+	CreateWalletInputSchema,
+	CreateTransactionInputSchema,
+	type BudgetCategory,
+	type CreateWalletInput,
+	type CreateTransactionInput,
+	type Wallet
+} from '$lib/schemas/budget';
 
 export interface ValidationResult {
 	valid: boolean;
 	errors: string[];
 }
 
+/**
+ * Validate budget categories using Zod schema
+ */
 export function validateCategories(categories: BudgetCategory[]): ValidationResult {
-	const errors: string[] = [];
+	const result = BudgetCategoriesSchema.safeParse(categories);
 
-	if (!categories || categories.length === 0) {
-		errors.push('At least one category is required');
-		return { valid: false, errors };
+	if (result.success) {
+		return { valid: true, errors: [] };
 	}
 
-	// Check for valid percentages
-	for (const category of categories) {
-		if (!category.name || category.name.trim() === '') {
-			errors.push('Category name cannot be empty');
-		}
-		if (category.percentage < 0) {
-			errors.push(`Category "${category.name}" has invalid percentage (must be >= 0)`);
-		}
-		if (category.percentage > 100) {
-			errors.push(`Category "${category.name}" has invalid percentage (must be <= 100)`);
-		}
-		if (!category.color || !/^#[0-9A-Fa-f]{6}$/.test(category.color)) {
-			errors.push(`Category "${category.name}" has invalid color format (use #RRGGBB)`);
-		}
-	}
-
-	// Check for duplicates
-	const names = categories.map((c) => c.name.toLowerCase().trim());
-	const uniqueNames = new Set(names);
-	if (uniqueNames.size !== names.length) {
-		errors.push('Duplicate category names are not allowed');
-	}
-
-	// Check total equals 100%
-	const total = categories.reduce((sum, c) => sum + c.percentage, 0);
-	if (Math.abs(total - 100) > 0.01) {
-		errors.push(`Categories must total 100% (currently ${total.toFixed(2)}%)`);
-	}
-
-	return { valid: errors.length === 0, errors };
+	// Zod v4 uses 'issues' instead of 'errors'
+	const errors = result.error.issues.map((e) => e.message);
+	return { valid: false, errors };
 }
 
+/**
+ * Validate wallet input using Zod schema
+ */
 export function validateWalletInput(input: CreateWalletInput): ValidationResult {
-	const errors: string[] = [];
+	const result = CreateWalletInputSchema.safeParse(input);
 
-	if (!input.name || input.name.trim() === '') {
-		errors.push('Wallet name is required');
+	if (result.success) {
+		return { valid: true, errors: [] };
 	}
 
-	if (input.name && input.name.length > 100) {
-		errors.push('Wallet name must be 100 characters or less');
-	}
-
-	if (typeof input.balance !== 'number' || isNaN(input.balance)) {
-		errors.push('Balance must be a valid number');
-	}
-
-	if (input.balance < 0) {
-		errors.push('Balance cannot be negative');
-	}
-
-	if (!input.currency || input.currency.trim() === '') {
-		errors.push('Currency is required');
-	}
-
-	if (input.currency && !/^[A-Z]{3}$/.test(input.currency.toUpperCase())) {
-		errors.push('Currency must be a valid 3-letter code (e.g., USD, EUR)');
-	}
-
-	// Validate categories
-	const categoryValidation = validateCategories(input.categories);
-	errors.push(...categoryValidation.errors);
-
-	return { valid: errors.length === 0, errors };
+	const errors = result.error.issues.map((e) => {
+		const path = e.path.join('.');
+		return path ? `${path}: ${e.message}` : e.message;
+	});
+	return { valid: false, errors };
 }
 
+/**
+ * Validate transaction input using Zod schema
+ */
 export function validateTransactionInput(
 	input: CreateTransactionInput,
 	wallet: Wallet
 ): ValidationResult {
-	const errors: string[] = [];
+	const result = CreateTransactionInputSchema.safeParse(input);
 
-	if (!input.wallet) {
-		errors.push('Wallet ID is required');
-	}
-
-	if (!input.category || input.category.trim() === '') {
-		errors.push('Category is required');
+	if (!result.success) {
+		const errors = result.error.issues.map((e) => {
+			const path = e.path.join('.');
+			return path ? `${path}: ${e.message}` : e.message;
+		});
+		return { valid: false, errors };
 	}
 
 	// Check if category exists in wallet
-	if (input.category && wallet) {
-		const categoryExists = wallet.categories.some(
-			(c) => c.name.toLowerCase() === input.category.toLowerCase()
-		);
-		if (!categoryExists) {
-			errors.push(`Category "${input.category}" does not exist in this wallet`);
-		}
+	const categoryExists = wallet.categories.some(
+		(c) => c.name.toLowerCase() === input.category.toLowerCase()
+	);
+
+	if (!categoryExists) {
+		return {
+			valid: false,
+			errors: [`Category "${input.category}" does not exist in this wallet`]
+		};
 	}
 
-	if (typeof input.amount !== 'number' || isNaN(input.amount)) {
-		errors.push('Amount must be a valid number');
-	}
-
-	if (input.amount === 0) {
-		errors.push('Amount cannot be zero');
-	}
-
-	if (!input.date) {
-		errors.push('Date is required');
-	}
-
-	if (input.date && isNaN(Date.parse(input.date))) {
-		errors.push('Invalid date format');
-	}
-
-	if (input.description && input.description.length > 500) {
-		errors.push('Description must be 500 characters or less');
-	}
-
-	return { valid: errors.length === 0, errors };
+	return { valid: true, errors: [] };
 }
 
+/**
+ * Calculate total percentage of categories
+ */
 export function calculateCategoryTotal(categories: BudgetCategory[]): number {
 	return categories.reduce((sum, c) => sum + c.percentage, 0);
 }
 
+/**
+ * Get the allocated amount for a category based on wallet balance
+ */
 export function getCategoryAllocation(wallet: Wallet, categoryName: string): number {
 	const category = wallet.categories.find(
 		(c) => c.name.toLowerCase() === categoryName.toLowerCase()
 	);
 	if (!category) return 0;
 	return (wallet.balance * category.percentage) / 100;
+}
+
+/**
+ * Parse and validate data with Zod, returning formatted errors
+ */
+export function safeParseWithErrors<T>(
+	schema: z.ZodSchema<T>,
+	data: unknown
+): { success: true; data: T } | { success: false; errors: string[] } {
+	const result = schema.safeParse(data);
+
+	if (result.success) {
+		return { success: true, data: result.data };
+	}
+
+	const errors = result.error.issues.map((e) => {
+		const path = e.path.join('.');
+		return path ? `${path}: ${e.message}` : e.message;
+	});
+
+	return { success: false, errors };
 }

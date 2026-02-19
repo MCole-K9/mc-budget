@@ -1,12 +1,13 @@
 <script lang="ts">
-	import type { PageData } from './$types';
 	import { goto } from '$app/navigation';
+	import { getWallets } from '$lib/wallets.remote';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import WalletCard from '$lib/components/WalletCard.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Alert from '$lib/components/Alert.svelte';
 
-	let { data }: { data: PageData } = $props();
+	// Using experimental async - data loads automatically
+	const walletsPromise = getWallets();
 </script>
 
 <svelte:head>
@@ -23,24 +24,30 @@
 				</a>
 			</div>
 
-			{#if data.error}
+			{#await walletsPromise}
+				<div class="flex justify-center py-12">
+					<span class="loading loading-spinner loading-lg"></span>
+				</div>
+			{:then wallets}
+				{#if wallets.length === 0}
+					<div class="text-center py-12">
+						<p class="text-base-content/70 mb-4">You don't have any wallets yet</p>
+						<a href="/wallets/new">
+							<Button variant="primary">Create Your First Wallet</Button>
+						</a>
+					</div>
+				{:else}
+					<div class="grid gap-4 md:grid-cols-2">
+						{#each wallets as wallet}
+							<WalletCard {wallet} onclick={() => goto(`/wallets/${wallet.id}`)} />
+						{/each}
+					</div>
+				{/if}
+			{:catch error}
 				<Alert type="error">
-					{#snippet children()}{data.error}{/snippet}
+					{#snippet children()}{error.message}{/snippet}
 				</Alert>
-			{:else if data.wallets.length === 0}
-				<div class="text-center py-12">
-					<p class="text-base-content/70 mb-4">You don't have any wallets yet</p>
-					<a href="/wallets/new">
-						<Button variant="primary">Create Your First Wallet</Button>
-					</a>
-				</div>
-			{:else}
-				<div class="grid gap-4 md:grid-cols-2">
-					{#each data.wallets as wallet}
-						<WalletCard {wallet} onclick={() => goto(`/wallets/${wallet.id}`)} />
-					{/each}
-				</div>
-			{/if}
+			{/await}
 		</div>
 	{/snippet}
 </AuthGuard>
