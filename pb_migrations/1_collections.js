@@ -4,6 +4,12 @@ migrate((app) => {
   // Get the users collection ID
   const users = app.findCollectionByNameOrId("users");
 
+  // Helper to create autodate fields
+  const autodateFields = [
+    new AutodateField({ name: "created", onCreate: true, onUpdate: false }),
+    new AutodateField({ name: "updated", onCreate: true, onUpdate: true })
+  ];
+
   // Create presets collection
   const presets = new Collection({
     type: "base",
@@ -16,7 +22,8 @@ migrate((app) => {
     fields: [
       { type: "text", name: "name", required: true, max: 100 },
       { type: "text", name: "description", max: 500 },
-      { type: "json", name: "categories", required: true, maxSize: 2000000 }
+      { type: "json", name: "categories", required: true, maxSize: 2000000 },
+      ...autodateFields
     ]
   });
   app.save(presets);
@@ -35,12 +42,13 @@ migrate((app) => {
       { type: "text", name: "name", required: true, max: 100 },
       { type: "number", name: "balance", required: true },
       { type: "text", name: "currency", required: true, min: 3, max: 3, pattern: "^[A-Z]{3}$" },
-      { type: "json", name: "categories", required: true, maxSize: 2000000 }
+      { type: "json", name: "categories", required: true, maxSize: 2000000 },
+      ...autodateFields
     ]
   });
   app.save(wallets);
 
-  // Create transactions collection - need to get wallets ID after saving
+  // Create transactions collection
   const savedWallets = app.findCollectionByNameOrId("wallets");
 
   const transactions = new Collection({
@@ -56,7 +64,8 @@ migrate((app) => {
       { type: "text", name: "category", required: true, max: 100 },
       { type: "number", name: "amount", required: true },
       { type: "text", name: "description", max: 500 },
-      { type: "date", name: "date", required: true }
+      { type: "date", name: "date", required: true },
+      ...autodateFields
     ]
   });
   app.save(transactions);
