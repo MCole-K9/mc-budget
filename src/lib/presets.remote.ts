@@ -1,9 +1,7 @@
-import { z } from 'zod';
-import { query, prerender } from '$app/server';
+import { prerender } from '$app/server';
 import { pb } from '$lib/server/db';
 import { BudgetPresetSchema, type BudgetPreset } from '$lib/schemas/budget';
 
-// Default presets that are available without database
 const DEFAULT_PRESETS: BudgetPreset[] = [
 	{
 		id: 'preset-50-30-20',
@@ -45,42 +43,12 @@ const DEFAULT_PRESETS: BudgetPreset[] = [
 	}
 ];
 
-/**
- * Get all budget presets (prerendered for static data)
- */
 export const getPresets = prerender(async () => {
 	try {
-		const records = await pb.collection('presets').getFullList({
-			sort: 'name'
-		});
+		const records = await pb.collection('presets').getFullList({ sort: 'name' });
 		const dbPresets = records.map((r) => BudgetPresetSchema.parse(r));
 		return [...DEFAULT_PRESETS, ...dbPresets];
 	} catch {
 		return DEFAULT_PRESETS;
 	}
-});
-
-/**
- * Get a single preset by ID
- */
-export const getPreset = query(z.string(), async (id) => {
-	// Check default presets first
-	const defaultPreset = DEFAULT_PRESETS.find((p) => p.id === id);
-	if (defaultPreset) {
-		return defaultPreset;
-	}
-
-	try {
-		const record = await pb.collection('presets').getOne(id);
-		return BudgetPresetSchema.parse(record);
-	} catch {
-		return null;
-	}
-});
-
-/**
- * Get default presets only (no database call)
- */
-export const getDefaultPresets = prerender(async () => {
-	return DEFAULT_PRESETS;
 });

@@ -38,11 +38,3 @@ class AuthStore {
 }
 
 export const auth = new AuthStore();
-
-export function isAuthenticated(): boolean {
-	return auth.isAuthenticated;
-}
-
-export function getCurrentUser(): User | null {
-	return auth.user;
-}

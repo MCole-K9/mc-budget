@@ -6,7 +6,8 @@
       "Bash(timeout:*)",
       "mcp__svelte__list-sections",
       "Bash(bun run check)",
-      "WebFetch(domain:pocketbase.io)"
+      "WebFetch(domain:pocketbase.io)",
+      "Bash(xargs wc -l)"
     ]
   },
   "enableAllProjectMcpServers": true,

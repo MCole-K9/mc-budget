@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { theme, toggleTheme } from '$lib/stores/theme.svelte';
+	import { theme } from '$lib/stores/theme.svelte';
 </script>
 
 <label class="swap swap-rotate">
@@ -7,7 +7,7 @@
 		type="checkbox"
 		class="theme-controller"
 		checked={theme.current === 'dark'}
-		onchange={toggleTheme}
+		onchange={() => theme.toggle()}
 	/>
 	<!-- sun icon -->
 	<svg

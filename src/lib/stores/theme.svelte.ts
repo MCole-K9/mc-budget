@@ -28,11 +28,3 @@ class ThemeStore {
 }
 
 export const theme = new ThemeStore();
-
-export function toggleTheme() {
-	theme.toggle();
-}
-
-export function setTheme(newTheme: Theme) {
-	theme.set(newTheme);
-}
