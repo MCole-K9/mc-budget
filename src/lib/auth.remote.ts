@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { command, form, getRequestEvent } from '$app/server';
-import { redirect } from '@sveltejs/kit';
+import { redirect, invalid } from '@sveltejs/kit';
 import { pb } from '$lib/server/db';
 import {
 	LoginInputSchema,
@@ -24,7 +24,11 @@ function authCookieValue() {
  * Login with email and password
  */
 export const login = form(LoginInputSchema, async (input) => {
-	await pb.collection('users').authWithPassword(input.email, input.password);
+	try {
+		await pb.collection('users').authWithPassword(input.email, input.password);
+	} catch {
+		invalid('Invalid email or password');
+	}
 	getRequestEvent().cookies.set(COOKIE_NAME, authCookieValue(), COOKIE_OPTS);
 	redirect(303, '/wallets');
 });
@@ -33,17 +37,19 @@ export const login = form(LoginInputSchema, async (input) => {
  * Register a new user
  */
 export const register = form(RegisterInputSchema, async (input) => {
-	await pb.collection('users').create({
-		email: input.email,
-		password: input.password,
-		passwordConfirm: input.passwordConfirm,
-		name: input.name || ''
-	}).catch(err => {
+	try {
+		await pb.collection('users').create({
+			email: input.email,
+			password: input.password,
+			passwordConfirm: input.passwordConfirm,
+			name: input.name || ''
+		});
+	} catch (err: any) {
 		if (err.response?.data?.email?.code === 'validation_not_unique') {
-			throw new Error('An account with this email already exists');
+			invalid('An account with this email already exists');
 		}
-		throw new Error('Failed to create account');
-	});
+		invalid('Failed to create account');
+	}
 
 	await pb.collection('users').authWithPassword(input.email, input.password);
 	getRequestEvent().cookies.set(COOKIE_NAME, authCookieValue(), COOKIE_OPTS);
