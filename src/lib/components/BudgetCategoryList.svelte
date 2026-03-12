@@ -46,7 +46,7 @@
 </script>
 
 <div class="space-y-3">
-	{#each categories as category, index}
+	{#each categories as category, index (index)}
 		<BudgetCategoryInput
 			bind:category={categories[index]}
 			onchange={handleCategoryChange}

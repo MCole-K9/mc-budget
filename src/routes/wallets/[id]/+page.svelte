@@ -106,7 +106,7 @@
 			<Card title="Budget Allocation">
 				{#snippet children()}
 					<div class="space-y-3">
-						{#each wallet.categories as category}
+						{#each wallet.categories as category (category.name)}
 							<div class="flex items-center justify-between">
 								<div class="flex items-center gap-2">
 									<span
@@ -128,7 +128,7 @@
 
 					<!-- Visual bar -->
 					<div class="flex h-4 rounded-full overflow-hidden bg-base-300 mt-4">
-						{#each wallet.categories as category}
+						{#each wallet.categories as category (category.name)}
 							<div
 								class="h-full"
 								style="width: {category.percentage}%; background-color: {category.color};"

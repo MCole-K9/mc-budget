@@ -39,7 +39,7 @@
 	</div>
 {:else}
 	<div class="divide-y divide-base-300">
-		{#each transactions as transaction}
+		{#each transactions as transaction (transaction.id)}
 			<div class="flex items-center justify-between py-3">
 				<div class="flex items-center gap-3">
 					<span

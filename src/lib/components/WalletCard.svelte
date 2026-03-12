@@ -33,7 +33,7 @@
 			<div class="mt-4">
 				<p class="text-sm text-base-content/70 mb-2">Budget Allocation</p>
 				<div class="flex h-3 rounded-full overflow-hidden bg-base-300">
-					{#each wallet.categories as category}
+					{#each wallet.categories as category (category.name)}
 						<div
 							class="h-full"
 							style="width: {category.percentage}%; background-color: {category.color};"
@@ -42,7 +42,7 @@
 					{/each}
 				</div>
 				<div class="flex flex-wrap gap-2 mt-2">
-					{#each wallet.categories as category}
+					{#each wallet.categories as category (category.name)}
 						<div class="flex items-center gap-1 text-xs">
 							<span
 								class="w-2 h-2 rounded-full"

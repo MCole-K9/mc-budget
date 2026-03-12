@@ -2,18 +2,12 @@
 	import { goto } from '$app/navigation';
 	import { register } from '$lib/auth.remote';
 	import { auth } from '$lib/stores/auth.svelte';
-	import Input from '$lib/components/Input.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import Alert from '$lib/components/Alert.svelte';
 
-	// Remote form returns attributes to spread on form element
 	const registerForm = register;
 
-	// Track form state
-	let error = $state('');
-
-	// Check for successful registration result
 	$effect(() => {
 		if (registerForm.result?.user) {
 			auth.setUser(registerForm.result.user);
@@ -29,13 +23,7 @@
 <div class="max-w-md mx-auto">
 	<Card title="Create Account">
 		{#snippet children()}
-			{#if error}
-				<Alert type="error" dismissible ondismiss={() => (error = '')}>
-					{#snippet children()}{error}{/snippet}
-				</Alert>
-			{/if}
-
-			{#each registerForm.fields.allIssues() as issue}
+			{#each registerForm.fields.allIssues() as issue (issue.message)}
 				<Alert type="error">
 					{#snippet children()}{issue.message}{/snippet}
 				</Alert>
@@ -51,7 +39,7 @@
 						class="input input-bordered w-full"
 						placeholder="Your name"
 					/>
-					{#each registerForm.fields.name.issues() as issue}
+					{#each registerForm.fields.name.issues() as issue (issue.message)}
 						<label class="label">
 							<span class="label-text-alt text-error">{issue.message}</span>
 						</label>
@@ -67,7 +55,7 @@
 						class="input input-bordered w-full"
 						placeholder="you@example.com"
 					/>
-					{#each registerForm.fields.email.issues() as issue}
+					{#each registerForm.fields.email.issues() as issue (issue.message)}
 						<label class="label">
 							<span class="label-text-alt text-error">{issue.message}</span>
 						</label>
@@ -83,7 +71,7 @@
 						class="input input-bordered w-full"
 						placeholder="Create a password"
 					/>
-					{#each registerForm.fields.password.issues() as issue}
+					{#each registerForm.fields.password.issues() as issue (issue.message)}
 						<label class="label">
 							<span class="label-text-alt text-error">{issue.message}</span>
 						</label>
@@ -99,7 +87,7 @@
 						class="input input-bordered w-full"
 						placeholder="Confirm your password"
 					/>
-					{#each registerForm.fields.passwordConfirm.issues() as issue}
+					{#each registerForm.fields.passwordConfirm.issues() as issue (issue.message)}
 						<label class="label">
 							<span class="label-text-alt text-error">{issue.message}</span>
 						</label>

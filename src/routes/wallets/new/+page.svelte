@@ -177,7 +177,7 @@
 							<div class="bg-base-200 p-4 rounded-lg">
 								<h4 class="font-medium mb-2">Budget Summary</h4>
 								<div class="flex flex-wrap gap-2">
-									{#each categories as category}
+									{#each categories as category (category.name)}
 										<span
 											class="badge"
 											style="background-color: {category.color}; color: white;"

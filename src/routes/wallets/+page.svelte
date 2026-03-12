@@ -31,7 +31,7 @@
 				</div>
 			{:else}
 				<div class="grid gap-4 md:grid-cols-2">
-					{#each wallets as wallet}
+					{#each wallets as wallet (wallet.id)}
 						<WalletCard {wallet} onclick={() => goto(`/wallets/${wallet.id}`)} />
 					{/each}
 				</div>

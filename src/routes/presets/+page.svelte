@@ -25,7 +25,7 @@
 	</div>
 
 	<div class="grid gap-6 md:grid-cols-2">
-		{#each presets as preset}
+		{#each presets as preset (preset.id)}
 			<Card class="h-full">
 				{#snippet children()}
 					<h2 class="text-xl font-semibold">{preset.name}</h2>
@@ -33,7 +33,7 @@
 
 					<div class="mt-4">
 						<div class="flex h-4 rounded-full overflow-hidden bg-base-300">
-							{#each preset.categories as category}
+							{#each preset.categories as category (category.name)}
 								<div
 									class="h-full"
 									style="width: {category.percentage}%; background-color: {category.color};"
@@ -43,7 +43,7 @@
 						</div>
 
 						<div class="mt-3 space-y-1">
-							{#each preset.categories as category}
+							{#each preset.categories as category (category.name)}
 								<div class="flex items-center justify-between text-sm">
 									<div class="flex items-center gap-2">
 										<span

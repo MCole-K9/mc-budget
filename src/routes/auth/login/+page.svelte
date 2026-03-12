@@ -2,19 +2,12 @@
 	import { goto } from '$app/navigation';
 	import { login } from '$lib/auth.remote';
 	import { auth } from '$lib/stores/auth.svelte';
-	import Input from '$lib/components/Input.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import Alert from '$lib/components/Alert.svelte';
 
-	// Remote form returns attributes to spread on form element
 	const loginForm = login;
 
-	// Track form state
-	let loading = $state(false);
-	let error = $state('');
-
-	// Check for successful login result
 	$effect(() => {
 		if (loginForm.result?.user) {
 			auth.setUser(loginForm.result.user);
@@ -30,13 +23,7 @@
 <div class="max-w-md mx-auto">
 	<Card title="Sign In">
 		{#snippet children()}
-			{#if error}
-				<Alert type="error" dismissible ondismiss={() => (error = '')}>
-					{#snippet children()}{error}{/snippet}
-				</Alert>
-			{/if}
-
-			{#each loginForm.fields.allIssues() as issue}
+			{#each loginForm.fields.allIssues() as issue (issue.message)}
 				<Alert type="error">
 					{#snippet children()}{issue.message}{/snippet}
 				</Alert>
@@ -52,7 +39,7 @@
 						class="input input-bordered w-full"
 						placeholder="you@example.com"
 					/>
-					{#each loginForm.fields.email.issues() as issue}
+					{#each loginForm.fields.email.issues() as issue (issue.message)}
 						<label class="label">
 							<span class="label-text-alt text-error">{issue.message}</span>
 						</label>
@@ -68,7 +55,7 @@
 						class="input input-bordered w-full"
 						placeholder="Enter your password"
 					/>
-					{#each loginForm.fields.password.issues() as issue}
+					{#each loginForm.fields.password.issues() as issue (issue.message)}
 						<label class="label">
 							<span class="label-text-alt text-error">{issue.message}</span>
 						</label>
