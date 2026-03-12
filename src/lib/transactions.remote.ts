@@ -39,11 +39,16 @@ export const createTransaction = command(
 			date: input.date
 		});
 
+		getTransactions(input.wallet).refresh();
 		return TransactionSchema.parse(record);
 	}
 );
 
-export const deleteTransaction = command(z.string(), async (id) => {
-	await pb.collection('transactions').delete(id);
-	return { success: true };
-});
+export const deleteTransaction = command(
+	z.object({ id: z.string(), walletId: z.string() }),
+	async ({ id, walletId }) => {
+		await pb.collection('transactions').delete(id);
+		getTransactions(walletId).refresh();
+		return { success: true };
+	}
+);

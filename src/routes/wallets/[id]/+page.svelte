@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { getWallet, deleteWallet } from '$lib/wallets.remote';
 	import {
 		getTransactions,
@@ -31,7 +31,6 @@
 
 		try {
 			await createTransaction({ input, wallet });
-			await invalidateAll();
 			showAddTransaction = false;
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to add transaction';
@@ -42,8 +41,7 @@
 
 	async function handleDeleteTransaction(transaction: Transaction) {
 		try {
-			await removeTransaction(transaction.id);
-			await invalidateAll();
+			await removeTransaction({ id: transaction.id, walletId: transaction.wallet });
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to delete transaction';
 		}
