@@ -23,7 +23,7 @@
 
 	const walletId = page.params.id!;
 	const wallet = await getWallet(walletId);
-	const transactions = await getTransactions(walletId);
+	const transactions = $derived(await getTransactions(walletId));
 
 	async function handleAddTransaction(input: CreateTransactionInput) {
 		transactionLoading = true;
@@ -141,7 +141,7 @@
 			<Card title="Transactions">
 				{#snippet children()}
 					<TransactionList
-						{transactions}
+						transactions={transactions}
 						{wallet}
 						ondelete={handleDeleteTransaction}
 					/>

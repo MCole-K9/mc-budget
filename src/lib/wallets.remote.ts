@@ -43,6 +43,7 @@ export const createWallet = command(CreateWalletInputSchema, async (input) => {
 		categories: input.categories
 	});
 
+	getWallets().refresh();
 	return WalletSchema.parse(record);
 });
 
@@ -51,6 +52,7 @@ export const createWallet = command(CreateWalletInputSchema, async (input) => {
  */
 export const deleteWallet = command(z.string(), async (id) => {
 	await pb.collection('wallets').delete(id);
+	getWallets().refresh();
 	return { success: true };
 });
 

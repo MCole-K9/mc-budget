@@ -5,7 +5,7 @@
 	import WalletCard from '$lib/components/WalletCard.svelte';
 	import Button from '$lib/components/Button.svelte';
 
-	const wallets = await getWallets();
+	const wallets = $derived(await getWallets());
 </script>
 
 <svelte:head>
