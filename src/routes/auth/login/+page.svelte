@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { login } from '$lib/auth.remote';
-	import { auth } from '$lib/stores/auth.svelte';
+	import pb from '$lib/api/pocketbase';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import Alert from '$lib/components/Alert.svelte';
@@ -9,8 +9,8 @@
 	const loginForm = login;
 
 	$effect(() => {
-		if (loginForm.result?.user) {
-			auth.setUser(loginForm.result.user);
+		if (loginForm.result?.token) {
+			pb.authStore.save(loginForm.result.token, loginForm.result.user);
 			goto('/wallets');
 		}
 	});
