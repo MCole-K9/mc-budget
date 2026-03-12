@@ -2,48 +2,42 @@ import { browser } from '$app/environment';
 import pb from '$lib/api/pocketbase';
 import type { User } from '$lib/types/budget';
 
-function createAuthStore() {
-	let user = $state.raw<User | null>(null);
-	let isLoading = $state(true);
+class AuthStore {
+	user = $state.raw<User | null>(null);
+	isLoading = $state(true);
 
-	if (browser) {
-		// Initialize from PocketBase auth store
-		if (pb.authStore.isValid && pb.authStore.record) {
-			user = pb.authStore.record as unknown as User;
-		}
-		isLoading = false;
-
-		// Listen for auth changes
-		pb.authStore.onChange(() => {
-			if (pb.authStore.isValid && pb.authStore.record) {
-				user = pb.authStore.record as unknown as User;
-			} else {
-				user = null;
-			}
-		});
+	get isAuthenticated() {
+		return !!this.user;
 	}
 
-	return {
-		get user() {
-			return user;
-		},
-		get isAuthenticated() {
-			return !!user;
-		},
-		get isLoading() {
-			return isLoading;
-		},
-		setUser(newUser: unknown) {
-			user = newUser as User | null;
-		},
-		clear() {
-			user = null;
-			pb.authStore.clear();
+	constructor() {
+		if (browser) {
+			if (pb.authStore.isValid && pb.authStore.record) {
+				this.user = pb.authStore.record as unknown as User;
+			}
+			this.isLoading = false;
+
+			pb.authStore.onChange(() => {
+				if (pb.authStore.isValid && pb.authStore.record) {
+					this.user = pb.authStore.record as unknown as User;
+				} else {
+					this.user = null;
+				}
+			});
 		}
-	};
+	}
+
+	setUser(newUser: unknown) {
+		this.user = newUser as User | null;
+	}
+
+	clear() {
+		this.user = null;
+		pb.authStore.clear();
+	}
 }
 
-export const auth = createAuthStore();
+export const auth = new AuthStore();
 
 export function isAuthenticated(): boolean {
 	return auth.isAuthenticated;

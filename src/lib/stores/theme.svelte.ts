@@ -2,36 +2,37 @@ import { browser } from '$app/environment';
 
 type Theme = 'light' | 'dark';
 
-function createThemeStore() {
-	let current = $state<Theme>('light');
+class ThemeStore {
+	current = $state<Theme>('light');
 
-	if (browser) {
-		const stored = localStorage.getItem('theme') as Theme | null;
-		const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-		current = stored || (prefersDark ? 'dark' : 'light');
-		document.documentElement.setAttribute('data-theme', current);
+	constructor() {
+		if (browser) {
+			const stored = localStorage.getItem('theme') as Theme | null;
+			const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+			this.current = stored || (prefersDark ? 'dark' : 'light');
+			document.documentElement.setAttribute('data-theme', this.current);
+		}
 	}
 
-	return {
-		get current() {
-			return current;
-		},
-		set current(value: Theme) {
-			current = value;
-			if (browser) {
-				localStorage.setItem('theme', value);
-				document.documentElement.setAttribute('data-theme', value);
-			}
+	set(value: Theme) {
+		this.current = value;
+		if (browser) {
+			localStorage.setItem('theme', value);
+			document.documentElement.setAttribute('data-theme', value);
 		}
-	};
+	}
+
+	toggle() {
+		this.set(this.current === 'light' ? 'dark' : 'light');
+	}
 }
 
-export const theme = createThemeStore();
+export const theme = new ThemeStore();
 
 export function toggleTheme() {
-	theme.current = theme.current === 'light' ? 'dark' : 'light';
+	theme.toggle();
 }
 
 export function setTheme(newTheme: Theme) {
-	theme.current = newTheme;
+	theme.set(newTheme);
 }
