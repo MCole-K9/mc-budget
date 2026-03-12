@@ -3,7 +3,7 @@ import pb from '$lib/api/pocketbase';
 import type { User } from '$lib/types/budget';
 
 function createAuthStore() {
-	let user = $state<User | null>(null);
+	let user = $state.raw<User | null>(null);
 	let isLoading = $state(true);
 
 	if (browser) {
@@ -33,8 +33,8 @@ function createAuthStore() {
 		get isLoading() {
 			return isLoading;
 		},
-		setUser(newUser: User | null) {
-			user = newUser;
+		setUser(newUser: unknown) {
+			user = newUser as User | null;
 		},
 		clear() {
 			user = null;

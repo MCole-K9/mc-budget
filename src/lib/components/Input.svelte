@@ -1,10 +1,11 @@
 <script lang="ts">
-	import type { HTMLInputAttributes } from 'svelte/elements';
+	import type { ClassValue, HTMLInputAttributes } from 'svelte/elements';
 
 	interface Props extends HTMLInputAttributes {
 		label?: string;
 		error?: string;
 		hint?: string;
+		class?: ClassValue;
 	}
 
 	let {
@@ -12,7 +13,7 @@
 		error,
 		hint,
 		value = $bindable(),
-		class: className = '',
+		class: className,
 		...rest
 	}: Props = $props();
 </script>
@@ -24,7 +25,7 @@
 		</label>
 	{/if}
 	<input
-		class="input input-bordered w-full {error ? 'input-error' : ''} {className}"
+		class={['input input-bordered w-full', error && 'input-error', className]}
 		bind:value
 		{...rest}
 	/>

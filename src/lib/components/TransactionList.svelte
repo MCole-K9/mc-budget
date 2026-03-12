@@ -57,9 +57,7 @@
 				</div>
 				<div class="flex items-center gap-2">
 					<span
-						class="font-semibold {transaction.amount < 0
-							? 'text-error'
-							: 'text-success'}"
+						class={['font-semibold', transaction.amount < 0 ? 'text-error' : 'text-success']}
 					>
 						{transaction.amount < 0 ? '-' : '+'}{formatCurrency(transaction.amount)}
 					</span>

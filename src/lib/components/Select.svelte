@@ -1,12 +1,13 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import type { HTMLSelectAttributes } from 'svelte/elements';
+	import type { ClassValue, HTMLSelectAttributes } from 'svelte/elements';
 
 	interface Props extends HTMLSelectAttributes {
 		label?: string;
 		error?: string;
 		options?: { value: string; label: string }[];
 		children?: Snippet;
+		class?: ClassValue;
 	}
 
 	let {
@@ -14,7 +15,7 @@
 		error,
 		options = [],
 		value = $bindable(),
-		class: className = '',
+		class: className,
 		children,
 		...rest
 	}: Props = $props();
@@ -27,7 +28,7 @@
 		</label>
 	{/if}
 	<select
-		class="select select-bordered w-full {error ? 'select-error' : ''} {className}"
+		class={['select select-bordered w-full', error && 'select-error', className]}
 		bind:value
 		{...rest}
 	>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import type { ClassValue } from 'svelte/elements';
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 
 	interface Props extends HTMLButtonAttributes {
@@ -8,6 +9,7 @@
 		outline?: boolean;
 		loading?: boolean;
 		children: Snippet;
+		class?: ClassValue;
 	}
 
 	let {
@@ -16,12 +18,12 @@
 		outline = false,
 		loading = false,
 		children,
-		class: className = '',
+		class: className,
 		disabled,
 		...rest
 	}: Props = $props();
 
-	const variantClasses: Record<string, string> = {
+	const variantClass = {
 		primary: 'btn-primary',
 		secondary: 'btn-secondary',
 		accent: 'btn-accent',
@@ -29,18 +31,18 @@
 		link: 'btn-link',
 		error: 'btn-error',
 		success: 'btn-success'
-	};
+	}[variant];
 
-	const sizeClasses: Record<string, string> = {
+	const sizeClass = {
 		xs: 'btn-xs',
 		sm: 'btn-sm',
 		md: '',
 		lg: 'btn-lg'
-	};
+	}[size];
 </script>
 
 <button
-	class="btn {variantClasses[variant]} {sizeClasses[size]} {outline ? 'btn-outline' : ''} {className}"
+	class={['btn', variantClass, sizeClass, outline && 'btn-outline', className]}
 	disabled={disabled || loading}
 	{...rest}
 >

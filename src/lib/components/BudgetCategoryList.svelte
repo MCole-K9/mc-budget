@@ -61,9 +61,7 @@
 	{/if}
 
 	<div
-		class="flex justify-between items-center p-2 rounded-lg {isValid
-			? 'bg-success/10 text-success'
-			: 'bg-error/10 text-error'}"
+		class={['flex justify-between items-center p-2 rounded-lg', isValid ? 'bg-success/10 text-success' : 'bg-error/10 text-error']}
 	>
 		<span class="font-medium">Total:</span>
 		<span class="font-bold">{total.toFixed(1)}%</span>

@@ -1,16 +1,17 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import type { ClassValue } from 'svelte/elements';
 
 	interface Props {
 		open: boolean;
 		title?: string;
-		class?: string;
+		class?: ClassValue;
 		children: Snippet;
 		actions?: Snippet;
 		onclose?: () => void;
 	}
 
-	let { open = $bindable(), title, class: className = '', children, actions, onclose }: Props = $props();
+	let { open = $bindable(), title, class: className, children, actions, onclose }: Props = $props();
 
 	function handleClose() {
 		open = false;
@@ -35,7 +36,7 @@
 {#if open}
 	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 	<div class="modal modal-open" onclick={handleBackdropClick}>
-		<div class="modal-box {className}">
+		<div class={['modal-box', className]}>
 			{#if title}
 				<h3 class="font-bold text-lg">{title}</h3>
 			{/if}
