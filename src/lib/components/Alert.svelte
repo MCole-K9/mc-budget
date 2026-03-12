@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import type { ClassValue } from 'svelte/elements';
 
 	interface Props {
 		type?: 'info' | 'success' | 'warning' | 'error';
 		dismissible?: boolean;
-		class?: string;
+		class?: ClassValue;
 		children: Snippet;
 		ondismiss?: () => void;
 	}
@@ -12,19 +13,19 @@
 	let {
 		type = 'info',
 		dismissible = false,
-		class: className = '',
+		class: className,
 		children,
 		ondismiss
 	}: Props = $props();
 
 	let visible = $state(true);
 
-	const typeClasses: Record<string, string> = {
+	const typeClass = {
 		info: 'alert-info',
 		success: 'alert-success',
 		warning: 'alert-warning',
 		error: 'alert-error'
-	};
+	}[type];
 
 	const icons: Record<string, string> = {
 		info: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
@@ -40,7 +41,7 @@
 </script>
 
 {#if visible}
-	<div class="alert {typeClasses[type]} {className}" role="alert">
+	<div class={['alert', typeClass, className]} role="alert">
 		<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="h-6 w-6 shrink-0 stroke-current">
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={icons[type]} />
 		</svg>
