@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { command, form } from '$app/server';
+import { command, form, getRequestEvent } from '$app/server';
+import { redirect } from '@sveltejs/kit';
 import { pb } from '$lib/server/db';
 import {
 	LoginInputSchema,
@@ -7,25 +8,32 @@ import {
 	UserSchema
 } from '$lib/schemas/budget';
 
+const COOKIE_NAME = 'pb_auth';
+const COOKIE_OPTS = {
+	path: '/',
+	httpOnly: true,
+	maxAge: 60 * 60 * 24 * 30,
+	sameSite: 'lax'
+} as const;
+
+function authCookieValue() {
+	return JSON.stringify({ token: pb.authStore.token, record: pb.authStore.record });
+}
+
 /**
  * Login with email and password
  */
 export const login = form(LoginInputSchema, async (input) => {
-	const authData = await pb
-		.collection('users')
-		.authWithPassword(input.email, input.password);
-
-	return {
-		user: authData.record,
-		token: pb.authStore.token
-	};
+	await pb.collection('users').authWithPassword(input.email, input.password);
+	getRequestEvent().cookies.set(COOKIE_NAME, authCookieValue(), COOKIE_OPTS);
+	redirect(303, '/wallets');
 });
 
 /**
  * Register a new user
  */
 export const register = form(RegisterInputSchema, async (input) => {
-	const record = await pb.collection('users').create({
+	await pb.collection('users').create({
 		email: input.email,
 		password: input.password,
 		passwordConfirm: input.passwordConfirm,
@@ -38,11 +46,8 @@ export const register = form(RegisterInputSchema, async (input) => {
 	});
 
 	await pb.collection('users').authWithPassword(input.email, input.password);
-
-	return {
-		user: record,
-		token: pb.authStore.token
-	};
+	getRequestEvent().cookies.set(COOKIE_NAME, authCookieValue(), COOKIE_OPTS);
+	redirect(303, '/wallets');
 });
 
 /**
@@ -50,6 +55,7 @@ export const register = form(RegisterInputSchema, async (input) => {
  */
 export const logout = command(async () => {
 	pb.authStore.clear();
+	getRequestEvent().cookies.delete(COOKIE_NAME, { path: '/' });
 	return { success: true };
 });
 

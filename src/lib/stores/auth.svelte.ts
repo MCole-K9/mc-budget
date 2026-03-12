@@ -1,5 +1,3 @@
-import { browser } from '$app/environment';
-import pb from '$lib/api/pocketbase';
 import type { User } from '$lib/types/budget';
 
 class AuthStore {
@@ -10,30 +8,14 @@ class AuthStore {
 		return !!this.user;
 	}
 
-	constructor() {
-		if (browser) {
-			if (pb.authStore.isValid && pb.authStore.record) {
-				this.user = pb.authStore.record as unknown as User;
-			}
-			this.isLoading = false;
-
-			pb.authStore.onChange(() => {
-				if (pb.authStore.isValid && pb.authStore.record) {
-					this.user = pb.authStore.record as unknown as User;
-				} else {
-					this.user = null;
-				}
-			});
-		}
-	}
-
-	setUser(newUser: unknown) {
-		this.user = newUser as User | null;
+	setUser(user: unknown) {
+		this.user = user as User | null;
+		this.isLoading = false;
 	}
 
 	clear() {
 		this.user = null;
-		pb.authStore.clear();
+		this.isLoading = false;
 	}
 }
 

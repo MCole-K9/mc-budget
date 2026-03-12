@@ -1,19 +1,10 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { register } from '$lib/auth.remote';
-	import pb from '$lib/api/pocketbase';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import Alert from '$lib/components/Alert.svelte';
 
 	const registerForm = register;
-
-	$effect(() => {
-		if (registerForm.result?.token) {
-			pb.authStore.save(registerForm.result.token, registerForm.result.user);
-			goto('/wallets');
-		}
-	});
 </script>
 
 <svelte:head>

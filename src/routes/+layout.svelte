@@ -3,11 +3,17 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import { auth } from '$lib/stores/auth.svelte';
+	import { logout } from '$lib/auth.remote';
 	import { goto } from '$app/navigation';
 
-	let { children } = $props();
+	let { data, children } = $props();
+
+	$effect(() => {
+		auth.setUser(data.user ?? null);
+	});
 
 	async function handleLogout() {
+		await logout();
 		auth.clear();
 		await goto('/auth/login');
 	}
