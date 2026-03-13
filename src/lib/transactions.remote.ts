@@ -1,14 +1,10 @@
 import { z } from 'zod';
 import { query, command } from '$app/server';
-import { pb } from '$lib/server/db';
-import {
-	CreateTransactionInputSchema,
-	TransactionSchema,
-	WalletSchema
-} from '$lib/schemas/budget';
+import { getPb } from '$lib/server/db';
+import { CreateTransactionInputSchema, TransactionSchema, WalletSchema } from '$lib/schemas/budget';
 
 export const getTransactions = query(z.string(), async (walletId) => {
-	const records = await pb.collection('transactions').getFullList({
+	const records = await getPb().collection('transactions').getFullList({
 		filter: `wallet = "${walletId}"`,
 		sort: '-date,-created'
 	});
@@ -26,12 +22,11 @@ export const createTransaction = command(
 		const categoryExists = wallet.categories.some(
 			(c) => c.name.toLowerCase() === input.category.toLowerCase()
 		);
-
 		if (!categoryExists) {
 			throw new Error(`Category "${input.category}" does not exist in this wallet`);
 		}
 
-		const record = await pb.collection('transactions').create({
+		const record = await getPb().collection('transactions').create({
 			wallet: input.wallet,
 			category: input.category,
 			amount: input.amount,
@@ -47,7 +42,7 @@ export const createTransaction = command(
 export const deleteTransaction = command(
 	z.object({ id: z.string(), walletId: z.string() }),
 	async ({ id, walletId }) => {
-		await pb.collection('transactions').delete(id);
+		await getPb().collection('transactions').delete(id);
 		getTransactions(walletId).refresh();
 		return { success: true };
 	}
