@@ -23,7 +23,7 @@
 		...rest
 	}: Props = $props();
 
-	const variantClass = {
+	const variantClasses = {
 		primary: 'btn-primary',
 		secondary: 'btn-secondary',
 		accent: 'btn-accent',
@@ -31,14 +31,18 @@
 		link: 'btn-link',
 		error: 'btn-error',
 		success: 'btn-success'
-	}[variant];
+	} as const;
 
-	const sizeClass = {
+	const variantClass = $derived(variantClasses[variant]);
+
+	const sizeClasses = {
 		xs: 'btn-xs',
 		sm: 'btn-sm',
 		md: '',
 		lg: 'btn-lg'
-	}[size];
+	} as const;
+
+	const sizeClass = $derived(sizeClasses[size]);
 </script>
 
 <button

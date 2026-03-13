@@ -13,87 +13,83 @@
 
 <div class="max-w-md mx-auto">
 	<Card title="Create Account">
-		{#snippet children()}
-			{#each registerForm.fields.allIssues() as issue (issue.message)}
-				<Alert type="error">
-					{#snippet children()}{issue.message}{/snippet}
-				</Alert>
-			{/each}
+		{#each registerForm.fields.allIssues() as issue (issue.message)}
+			<Alert type="error">{issue.message}</Alert>
+		{/each}
 
-			<form {...registerForm} class="space-y-4 mt-4">
-				<div class="form-control w-full">
-					<label class="label">
-						<span class="label-text">Name</span>
-					</label>
-					<input
-						{...registerForm.fields.name.as('text')}
-						class="input input-bordered w-full"
-						placeholder="Your name"
-					/>
-					{#each registerForm.fields.name.issues() as issue (issue.message)}
-						<label class="label">
-							<span class="label-text-alt text-error">{issue.message}</span>
-						</label>
-					{/each}
+		<form {...registerForm} class="space-y-4 mt-4">
+			<div class="form-control w-full">
+				<div class="label">
+					<span class="label-text">Name</span>
 				</div>
+				<input
+					{...registerForm.fields.name.as('text')}
+					class="input input-bordered w-full"
+					placeholder="Your name"
+				/>
+				{#each registerForm.fields.name.issues() as issue (issue.message)}
+					<div class="label">
+						<span class="label-text-alt text-error">{issue.message}</span>
+					</div>
+				{/each}
+			</div>
 
-				<div class="form-control w-full">
-					<label class="label">
-						<span class="label-text">Email</span>
-					</label>
-					<input
-						{...registerForm.fields.email.as('email')}
-						class="input input-bordered w-full"
-						placeholder="you@example.com"
-					/>
-					{#each registerForm.fields.email.issues() as issue (issue.message)}
-						<label class="label">
-							<span class="label-text-alt text-error">{issue.message}</span>
-						</label>
-					{/each}
+			<div class="form-control w-full">
+				<div class="label">
+					<span class="label-text">Email</span>
 				</div>
+				<input
+					{...registerForm.fields.email.as('email')}
+					class="input input-bordered w-full"
+					placeholder="you@example.com"
+				/>
+				{#each registerForm.fields.email.issues() as issue (issue.message)}
+					<div class="label">
+						<span class="label-text-alt text-error">{issue.message}</span>
+					</div>
+				{/each}
+			</div>
 
-				<div class="form-control w-full">
-					<label class="label">
-						<span class="label-text">Password</span>
-					</label>
-					<input
-						{...registerForm.fields.password.as('password')}
-						class="input input-bordered w-full"
-						placeholder="Create a password"
-					/>
-					{#each registerForm.fields.password.issues() as issue (issue.message)}
-						<label class="label">
-							<span class="label-text-alt text-error">{issue.message}</span>
-						</label>
-					{/each}
+			<div class="form-control w-full">
+				<div class="label">
+					<span class="label-text">Password</span>
 				</div>
+				<input
+					{...registerForm.fields.password.as('password')}
+					class="input input-bordered w-full"
+					placeholder="Create a password"
+				/>
+				{#each registerForm.fields.password.issues() as issue (issue.message)}
+					<div class="label">
+						<span class="label-text-alt text-error">{issue.message}</span>
+					</div>
+				{/each}
+			</div>
 
-				<div class="form-control w-full">
-					<label class="label">
-						<span class="label-text">Confirm Password</span>
-					</label>
-					<input
-						{...registerForm.fields.passwordConfirm.as('password')}
-						class="input input-bordered w-full"
-						placeholder="Confirm your password"
-					/>
-					{#each registerForm.fields.passwordConfirm.issues() as issue (issue.message)}
-						<label class="label">
-							<span class="label-text-alt text-error">{issue.message}</span>
-						</label>
-					{/each}
+			<div class="form-control w-full">
+				<div class="label">
+					<span class="label-text">Confirm Password</span>
 				</div>
+				<input
+					{...registerForm.fields.passwordConfirm.as('password')}
+					class="input input-bordered w-full"
+					placeholder="Confirm your password"
+				/>
+				{#each registerForm.fields.passwordConfirm.issues() as issue (issue.message)}
+					<div class="label">
+						<span class="label-text-alt text-error">{issue.message}</span>
+					</div>
+				{/each}
+			</div>
 
-				<Button type="submit" variant="primary" class="w-full" loading={!!registerForm.pending}>
-					Create Account
-				</Button>
-			</form>
+			<Button type="submit" variant="primary" class="w-full" loading={!!registerForm.pending}>
+				Create Account
+			</Button>
+		</form>
 
-			<p class="text-center mt-4 text-sm text-base-content/70">
-				Already have an account?
-				<a href="/auth/login" class="link link-primary">Sign in</a>
-			</p>
-		{/snippet}
+		<p class="text-center mt-4 text-sm text-base-content/70">
+			Already have an account?
+			<a href="/auth/login" class="link link-primary">Sign in</a>
+		</p>
 	</Card>
 </div>

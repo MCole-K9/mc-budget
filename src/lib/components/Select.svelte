@@ -23,9 +23,9 @@
 
 <div class="form-control w-full">
 	{#if label}
-		<label class="label">
+		<div class="label">
 			<span class="label-text">{label}</span>
-		</label>
+		</div>
 	{/if}
 	<select
 		class={['select select-bordered w-full', error && 'select-error', className]}
@@ -41,8 +41,8 @@
 		{/if}
 	</select>
 	{#if error}
-		<label class="label">
+		<div class="label">
 			<span class="label-text-alt text-error">{error}</span>
-		</label>
+		</div>
 	{/if}
 </div>

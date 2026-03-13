@@ -48,6 +48,12 @@ Copy the example environment file:
 cp .env.example .env
 ```
 
+On Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
 Edit `.env` if your PocketBase instance runs on a different URL:
 
 ```env
@@ -61,9 +67,19 @@ PUBLIC_POCKETBASE_URL=http://127.0.0.1:8090
    cp -r pb_migrations /path/to/pocketbase/
    ```
 
+   On Windows PowerShell:
+   ```powershell
+   Copy-Item -Recurse pb_migrations C:\path\to\pocketbase\
+   ```
+
 2. Run PocketBase (migrations apply automatically):
    ```bash
    ./pocketbase serve
+   ```
+
+   On Windows:
+   ```powershell
+   .\pocketbase.exe serve
    ```
 
 3. Open the admin UI at `http://127.0.0.1:8090/_/` and create an admin account

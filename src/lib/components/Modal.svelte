@@ -24,6 +24,12 @@
 		}
 	}
 
+	function handleBackdropKeydown(e: KeyboardEvent) {
+		if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+			handleClose();
+		}
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
 			handleClose();
@@ -34,8 +40,13 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if open}
-	<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-	<div class="modal modal-open" onclick={handleBackdropClick}>
+	<div
+		class="modal modal-open"
+		role="button"
+		tabindex="0"
+		onclick={handleBackdropClick}
+		onkeydown={handleBackdropKeydown}
+	>
 		<div class={['modal-box', className]}>
 			{#if title}
 				<h3 class="font-bold text-lg">{title}</h3>

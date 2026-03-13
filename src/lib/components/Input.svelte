@@ -20,9 +20,9 @@
 
 <div class="form-control w-full">
 	{#if label}
-		<label class="label">
+		<div class="label">
 			<span class="label-text">{label}</span>
-		</label>
+		</div>
 	{/if}
 	<input
 		class={['input input-bordered w-full', error && 'input-error', className]}
@@ -30,12 +30,12 @@
 		{...rest}
 	/>
 	{#if error}
-		<label class="label">
+		<div class="label">
 			<span class="label-text-alt text-error">{error}</span>
-		</label>
+		</div>
 	{:else if hint}
-		<label class="label">
+		<div class="label">
 			<span class="label-text-alt">{hint}</span>
-		</label>
+		</div>
 	{/if}
 </div>

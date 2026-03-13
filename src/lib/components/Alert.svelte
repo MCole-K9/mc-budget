@@ -20,12 +20,14 @@
 
 	let visible = $state(true);
 
-	const typeClass = {
+	const alertClasses = {
 		info: 'alert-info',
 		success: 'alert-success',
 		warning: 'alert-warning',
 		error: 'alert-error'
-	}[type];
+	} as const;
+
+	const typeClass = $derived(alertClasses[type]);
 
 	const icons: Record<string, string> = {
 		info: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
