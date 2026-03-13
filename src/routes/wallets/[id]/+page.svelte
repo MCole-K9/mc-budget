@@ -118,12 +118,12 @@
 							{formatCurrency(wallet.balance, wallet.currency)}
 						</p>
 						<button
-							class="btn btn-ghost btn-xs text-base-content/40 hover:text-base-content/70"
+							class="btn btn-ghost btn-sm text-lg text-base-content/40 hover:text-base-content/70"
 							onclick={handleRecalculate}
 							disabled={reconciling}
 							title="Recalculate balance from transaction history"
 						>
-							{reconciling ? '...' : '&#8635;'}
+							{reconciling ? '...' : '↺'}
 						</button>
 					</div>
 				</div>
