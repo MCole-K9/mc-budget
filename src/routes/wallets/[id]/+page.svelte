@@ -128,6 +128,7 @@
 							{@const spent = getCategorySpent(category.name)}
 							{@const remaining = allocated - spent}
 							{@const spentPct = allocated > 0 ? Math.min(100, (spent / allocated) * 100) : 0}
+							{@const overBudget = remaining < 0}
 							<div class="space-y-1">
 								<div class="flex items-center justify-between">
 									<div class="flex items-center gap-2">
@@ -137,16 +138,20 @@
 										></span>
 										<span class="font-medium">{category.name}</span>
 										<span class="text-base-content/60">{category.percentage}%</span>
+										{#if overBudget}
+											<span class="badge badge-error badge-sm">Over budget</span>
+										{/if}
 									</div>
-									<span class="font-semibold">
-										{formatCurrency(remaining, wallet.currency)} left
+									<span class={['font-semibold', overBudget && 'text-error']}>
+										{formatCurrency(Math.abs(remaining), wallet.currency)}
+										{overBudget ? 'over' : 'left'}
 									</span>
 								</div>
 								<div class="flex items-center gap-2 pl-6">
 									<div class="flex-1 h-2 rounded-full bg-base-300 overflow-hidden">
 										<div
 											class="h-full rounded-full transition-all"
-											style="width: {spentPct}%; background-color: {category.color}; opacity: 0.7;"
+											style="width: {spentPct}%; background-color: {overBudget ? 'var(--color-error)' : category.color}; opacity: 0.7;"
 										></div>
 									</div>
 									<span class="text-xs text-base-content/60 shrink-0">

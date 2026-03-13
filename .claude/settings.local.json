@@ -7,7 +7,8 @@
       "mcp__svelte__list-sections",
       "Bash(bun run check)",
       "WebFetch(domain:pocketbase.io)",
-      "Bash(xargs wc -l)"
+      "Bash(xargs wc -l)",
+      "Bash(python3 -c \":*)"
     ]
   },
   "enableAllProjectMcpServers": true,

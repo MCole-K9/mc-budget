@@ -1,45 +1,49 @@
 <script lang="ts">
 	import { auth } from '$lib/stores/auth.svelte';
+	import { getWallets } from '$lib/wallets.remote';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
+	import WalletCard from '$lib/components/WalletCard.svelte';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+
+	const wallets = $derived(auth.isAuthenticated ? await getWallets() : []);
 </script>
 
 <div class="max-w-4xl mx-auto">
 	{#if auth.isAuthenticated}
-		<div class="text-center mb-8">
-			<h1 class="text-4xl font-bold mb-2">Welcome back, {auth.user?.name}!</h1>
-			<p class="text-base-content/70">Manage your budgets and track your spending</p>
+		<div class="flex justify-between items-center mb-6">
+			<div>
+				<h1 class="text-3xl font-bold">Welcome back, {auth.user?.name}!</h1>
+				<p class="text-base-content/70 mt-1">Here's your financial overview</p>
+			</div>
+			<div class="flex gap-2">
+				<a href={resolve('/wallets/new')}>
+					<Button variant="primary">New Wallet</Button>
+				</a>
+				<a href={resolve('/presets')}>
+					<Button variant="ghost">Presets</Button>
+				</a>
+			</div>
 		</div>
 
-		<div class="grid gap-6 md:grid-cols-2">
-			<a href={resolve('/wallets')}>
-				<Card class="h-full hover:shadow-lg transition-shadow">
-					{#snippet children()}
-						<h2 class="text-2xl font-semibold mb-2">My Wallets</h2>
-						<p class="text-base-content/70">View and manage your wallets and transactions</p>
-					{/snippet}
-				</Card>
-			</a>
-
-			<a href={resolve('/wallets/new')}>
-				<Card class="h-full hover:shadow-lg transition-shadow">
-					{#snippet children()}
-						<h2 class="text-2xl font-semibold mb-2">Create Wallet</h2>
-						<p class="text-base-content/70">Set up a new wallet with a budget template</p>
-					{/snippet}
-				</Card>
-			</a>
-
-			<a href={resolve('/presets')}>
-				<Card class="h-full hover:shadow-lg transition-shadow">
-					{#snippet children()}
-						<h2 class="text-2xl font-semibold mb-2">Budget Presets</h2>
-						<p class="text-base-content/70">Browse budget templates like 50/30/20 and more</p>
-					{/snippet}
-				</Card>
-			</a>
-		</div>
+		{#if wallets.length === 0}
+			<div class="text-center py-16">
+				<p class="text-base-content/70 mb-4 text-lg">No wallets yet — create one to get started</p>
+				<a href={resolve('/wallets/new')}>
+					<Button variant="primary" size="lg">Create Your First Wallet</Button>
+				</a>
+			</div>
+		{:else}
+			<div class="grid gap-4 md:grid-cols-2">
+				{#each wallets as wallet (wallet.id)}
+					<WalletCard {wallet} onclick={() => goto(resolve('/wallets/[id]', { id: wallet.id }))} />
+				{/each}
+			</div>
+			<div class="mt-4 text-right">
+				<a href={resolve('/wallets')} class="link link-primary text-sm">View all wallets &rarr;</a>
+			</div>
+		{/if}
 	{:else}
 		<div class="hero min-h-[60vh]">
 			<div class="hero-content text-center">
