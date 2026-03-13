@@ -19,11 +19,12 @@
 
 	let showAddTransaction = $state(false);
 	let showDeleteConfirm = $state(false);
+	let transactionToDelete = $state<Transaction | null>(null);
 	let transactionLoading = $state(false);
 	let error = $state('');
 
 	const walletId = page.params.id!;
-	const wallet = await getWallet(walletId);
+	const wallet = $derived(await getWallet(walletId));
 	const transactions = $derived(await getTransactions(walletId));
 
 	async function handleAddTransaction(input: CreateTransactionInput) {
@@ -40,11 +41,18 @@
 		}
 	}
 
-	async function handleDeleteTransaction(transaction: Transaction) {
+	function handleDeleteTransaction(transaction: Transaction) {
+		transactionToDelete = transaction;
+	}
+
+	async function confirmDeleteTransaction() {
+		if (!transactionToDelete) return;
 		try {
-			await removeTransaction({ id: transaction.id, walletId: transaction.wallet });
+			await removeTransaction({ id: transactionToDelete.id, walletId: transactionToDelete.wallet });
+			transactionToDelete = null;
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to delete transaction';
+			transactionToDelete = null;
 		}
 	}
 
@@ -161,7 +169,7 @@
 			{/snippet}
 		</Modal>
 
-		<!-- Delete Confirmation Modal -->
+		<!-- Delete Wallet Confirmation Modal -->
 		<Modal bind:open={showDeleteConfirm} title="Delete Wallet?">
 			{#snippet children()}
 				<p class="text-base-content/70">
@@ -176,6 +184,24 @@
 				<Button variant="error" onclick={handleDeleteWallet}>
 					Delete Wallet
 				</Button>
+			{/snippet}
+		</Modal>
+
+		<!-- Delete Transaction Confirmation Modal -->
+		<Modal
+			open={!!transactionToDelete}
+			title="Delete Transaction?"
+			onclose={() => (transactionToDelete = null)}
+		>
+			{#snippet children()}
+				<p class="text-base-content/70">
+					Are you sure you want to delete this transaction? This will reverse its effect on your
+					wallet balance.
+				</p>
+			{/snippet}
+			{#snippet actions()}
+				<Button variant="ghost" onclick={() => (transactionToDelete = null)}>Cancel</Button>
+				<Button variant="error" onclick={confirmDeleteTransaction}>Delete Transaction</Button>
 			{/snippet}
 		</Modal>
 	{/snippet}

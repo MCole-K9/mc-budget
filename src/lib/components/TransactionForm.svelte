@@ -13,6 +13,7 @@
 	let { wallet, onsubmit, loading = false }: Props = $props();
 
 	let category = $state('');
+	let incomeSource = $state('');
 	let amount = $state<number | ''>('');
 	let description = $state('');
 	let date = $state(new Date().toISOString().split('T')[0]);
@@ -25,13 +26,15 @@
 	function handleSubmit(e: Event) {
 		e.preventDefault();
 
-		if (!category || !amount || !date) return;
+		if (!amount || !date) return;
+		if (isExpense && !category) return;
 
 		const finalAmount = isExpense ? -Math.abs(Number(amount)) : Math.abs(Number(amount));
+		const finalCategory = isExpense ? category : incomeSource.trim() || 'Income';
 
 		onsubmit({
 			wallet: wallet.id,
-			category,
+			category: finalCategory,
 			amount: finalAmount,
 			description: description.trim() || undefined,
 			date
@@ -39,6 +42,7 @@
 
 		// Reset form
 		category = '';
+		incomeSource = '';
 		amount = '';
 		description = '';
 		date = new Date().toISOString().split('T')[0];
@@ -63,7 +67,16 @@
 		</button>
 	</div>
 
-	<Select label="Category" bind:value={category} options={categoryOptions} required />
+	{#if isExpense}
+		<Select label="Category" bind:value={category} options={categoryOptions} required />
+	{:else}
+		<Input
+			type="text"
+			label="Income Source (optional)"
+			bind:value={incomeSource}
+			placeholder="e.g. Salary, Freelance"
+		/>
+	{/if}
 
 	<Input
 		type="number"
