@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { getWallet, deleteWallet } from '$lib/wallets.remote';
+	import { getWallet, deleteWallet, recalculateBalance } from '$lib/wallets.remote';
 	import {
 		getTransactions,
 		createTransaction,
@@ -21,6 +21,7 @@
 	let showDeleteConfirm = $state(false);
 	let transactionToDelete = $state<Transaction | null>(null);
 	let transactionLoading = $state(false);
+	let reconciling = $state(false);
 	let error = $state('');
 
 	const walletId = page.params.id!;
@@ -65,6 +66,17 @@
 		}
 	}
 
+	async function handleRecalculate() {
+		reconciling = true;
+		try {
+			await recalculateBalance(walletId);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to recalculate balance';
+		} finally {
+			reconciling = false;
+		}
+	}
+
 	function formatCurrency(amount: number, currency: string): string {
 		return new Intl.NumberFormat('en-US', {
 			style: 'currency',
@@ -101,9 +113,19 @@
 				<div>
 					<a href={resolve('/wallets')} class="btn btn-ghost btn-sm mb-2">&larr; Back to Wallets</a>
 					<h1 class="text-3xl font-bold">{wallet.name}</h1>
-					<p class="text-4xl font-bold text-primary mt-2">
-						{formatCurrency(wallet.balance, wallet.currency)}
-					</p>
+					<div class="flex items-baseline gap-3 mt-2">
+						<p class="text-4xl font-bold text-primary">
+							{formatCurrency(wallet.balance, wallet.currency)}
+						</p>
+						<button
+							class="btn btn-ghost btn-xs text-base-content/40 hover:text-base-content/70"
+							onclick={handleRecalculate}
+							disabled={reconciling}
+							title="Recalculate balance from transaction history"
+						>
+							{reconciling ? '...' : '&#8635;'}
+						</button>
+					</div>
 				</div>
 				<div class="flex gap-2">
 					<Button variant="primary" onclick={() => (showAddTransaction = true)}>

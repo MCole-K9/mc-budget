@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { query, command } from '$app/server';
 import { getPb } from '$lib/server/db';
-import { CreateWalletInputSchema, WalletSchema } from '$lib/schemas/budget';
+import { CreateWalletInputSchema, WalletSchema, TransactionSchema } from '$lib/schemas/budget';
 
 export const getWallets = query(async () => {
 	const records = await getPb().collection('wallets').getFullList({ sort: '-created' });
@@ -22,6 +22,7 @@ export const createWallet = command(CreateWalletInputSchema, async (input) => {
 		user: user.id,
 		name: input.name.trim(),
 		balance: input.balance,
+		initial_balance: input.balance,
 		currency: input.currency,
 		categories: input.categories
 	});
@@ -43,3 +44,19 @@ export const updateWalletBalance = command(
 		return WalletSchema.parse(record);
 	}
 );
+
+export const recalculateBalance = command(z.string(), async (walletId) => {
+	const pb = getPb();
+	const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(walletId));
+	const records = await pb.collection('transactions').getFullList({
+		filter: `wallet = "${walletId}"`
+	});
+	const transactionSum = records
+		.map((r) => TransactionSchema.parse(r))
+		.reduce((sum, t) => sum + t.amount, 0);
+	const newBalance = wallet.initial_balance + transactionSum;
+	const updated = await pb.collection('wallets').update(walletId, { balance: newBalance });
+	getWallet(walletId).refresh();
+	getWallets().refresh();
+	return WalletSchema.parse(updated);
+});
