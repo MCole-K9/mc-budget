@@ -58,7 +58,8 @@ export const createTransaction = form(CreateTransactionFormSchema, async (input)
 	const record = await pb.collection('transactions').create(formData);
 
 	await pb.collection('wallets').update(input.walletId, {
-		balance: wallet.balance + finalAmount
+		balance: wallet.balance + finalAmount,
+		...(finalAmount > 0 && { total_funded: wallet.total_funded + finalAmount })
 	});
 
 	getTransactions(input.walletId).refresh();
@@ -75,7 +76,10 @@ export const deleteTransaction = command(
 		const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(walletId));
 
 		await pb.collection('transactions').delete(id);
-		await pb.collection('wallets').update(walletId, { balance: wallet.balance - transaction.amount });
+		await pb.collection('wallets').update(walletId, {
+			balance: wallet.balance - transaction.amount,
+			...(transaction.amount > 0 && { total_funded: wallet.total_funded - transaction.amount })
+		});
 
 		getTransactions(walletId).refresh();
 		getWallet(walletId).refresh();

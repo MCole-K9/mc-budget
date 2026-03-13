@@ -83,6 +83,7 @@ export const WalletSchema = z.object({
 	name: z.string(),
 	balance: z.number(),
 	initial_balance: z.number().catch(0),
+	total_funded: z.number().catch(0),
 	currency: z.string(),
 	categories: z.array(BudgetCategorySchema),
 	created: z.string(),

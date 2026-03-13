@@ -124,10 +124,10 @@
 				{#snippet children()}
 					<div class="space-y-4">
 						{#each wallet.categories as category (category.name)}
-							{@const remaining = getCategoryAmount(wallet.balance, category.percentage)}
+							{@const allocated = getCategoryAmount(wallet.total_funded, category.percentage)}
 							{@const spent = getCategorySpent(category.name)}
-							{@const total = remaining + spent}
-							{@const spentPct = total > 0 ? (spent / total) * 100 : 0}
+							{@const remaining = allocated - spent}
+							{@const spentPct = allocated > 0 ? Math.min(100, (spent / allocated) * 100) : 0}
 							<div class="space-y-1">
 								<div class="flex items-center justify-between">
 									<div class="flex items-center gap-2">

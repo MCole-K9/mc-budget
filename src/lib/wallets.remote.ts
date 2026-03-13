@@ -23,6 +23,7 @@ export const createWallet = command(CreateWalletInputSchema, async (input) => {
 		name: input.name.trim(),
 		balance: input.balance,
 		initial_balance: input.balance,
+		total_funded: input.balance,
 		currency: input.currency,
 		categories: input.categories
 	});
@@ -51,11 +52,15 @@ export const recalculateBalance = command(z.string(), async (walletId) => {
 	const records = await pb.collection('transactions').getFullList({
 		filter: `wallet = "${walletId}"`
 	});
-	const transactionSum = records
-		.map((r) => TransactionSchema.parse(r))
-		.reduce((sum, t) => sum + t.amount, 0);
+	const transactions = records.map((r) => TransactionSchema.parse(r));
+	const transactionSum = transactions.reduce((sum, t) => sum + t.amount, 0);
+	const incomeSum = transactions.filter((t) => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
 	const newBalance = wallet.initial_balance + transactionSum;
-	const updated = await pb.collection('wallets').update(walletId, { balance: newBalance });
+	const newTotalFunded = wallet.initial_balance + incomeSum;
+	const updated = await pb.collection('wallets').update(walletId, {
+		balance: newBalance,
+		total_funded: newTotalFunded
+	});
 	getWallet(walletId).refresh();
 	getWallets().refresh();
 	return WalletSchema.parse(updated);
