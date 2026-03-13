@@ -20,8 +20,9 @@
 	let error = $state('');
 
 	const walletId = page.params.id!;
-	const wallet = $derived(await getWallet(walletId));
-	const transactions = $derived(await getTransactions(walletId));
+	const [wallet, transactions] = $derived(
+		await Promise.all([getWallet(walletId), getTransactions(walletId)])
+	);
 
 	function handleDeleteTransaction(transaction: Transaction) {
 		transactionToDelete = transaction;
