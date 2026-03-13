@@ -1,55 +1,41 @@
 <script lang="ts">
-	import type { Wallet, CreateTransactionInput } from '$lib/types/budget';
-	import Input from './Input.svelte';
+	import { createTransaction } from '$lib/transactions.remote';
+	import type { Wallet } from '$lib/types/budget';
 	import Select from './Select.svelte';
+	import Input from './Input.svelte';
 	import Button from './Button.svelte';
 
 	interface Props {
 		wallet: Wallet;
-		onsubmit: (input: CreateTransactionInput) => void;
-		loading?: boolean;
+		onSuccess?: () => void;
 	}
 
-	let { wallet, onsubmit, loading = false }: Props = $props();
+	let { wallet, onSuccess }: Props = $props();
 
-	let category = $state('');
-	let incomeSource = $state('');
-	let amount = $state<number | ''>('');
-	let description = $state('');
-	let date = $state(new Date().toISOString().split('T')[0]);
 	let isExpense = $state(true);
+	let lastResultId = $state('');
 
 	const categoryOptions = $derived(
 		wallet.categories.map((c) => ({ value: c.name, label: c.name }))
 	);
 
-	function handleSubmit(e: Event) {
-		e.preventDefault();
-
-		if (!amount || !date) return;
-		if (isExpense && !category) return;
-
-		const finalAmount = isExpense ? -Math.abs(Number(amount)) : Math.abs(Number(amount));
-		const finalCategory = isExpense ? category : incomeSource.trim() || 'Income';
-
-		onsubmit({
-			wallet: wallet.id,
-			category: finalCategory,
-			amount: finalAmount,
-			description: description.trim() || undefined,
-			date
-		});
-
-		// Reset form
-		category = '';
-		incomeSource = '';
-		amount = '';
-		description = '';
-		date = new Date().toISOString().split('T')[0];
-	}
+	$effect(() => {
+		const result = createTransaction.result;
+		if (result?.id && result.id !== lastResultId) {
+			lastResultId = result.id;
+			onSuccess?.();
+		}
+	});
 </script>
 
-<form onsubmit={handleSubmit} class="space-y-4">
+<form {...createTransaction} enctype="multipart/form-data" class="space-y-4">
+	<input type="hidden" name="walletId" value={wallet.id} />
+	<input type="hidden" name="isExpense" value={String(isExpense)} />
+
+	{#each createTransaction.fields.allIssues() as issue (issue.message)}
+		<div class="alert alert-error py-2 text-sm">{issue.message}</div>
+	{/each}
+
 	<div class="flex gap-2">
 		<button
 			type="button"
@@ -68,20 +54,19 @@
 	</div>
 
 	{#if isExpense}
-		<Select label="Category" bind:value={category} options={categoryOptions} required />
+		<Select label="Category" name="category" options={categoryOptions} required />
 	{:else}
 		<Input
 			type="text"
+			name="incomeSource"
 			label="Income Source (optional)"
-			bind:value={incomeSource}
 			placeholder="e.g. Salary, Freelance"
 		/>
 	{/if}
 
 	<Input
-		type="number"
+		{...createTransaction.fields.amount.as('number')}
 		label="Amount"
-		bind:value={amount}
 		placeholder="0.00"
 		min="0.01"
 		step="0.01"
@@ -89,15 +74,30 @@
 	/>
 
 	<Input
-		type="text"
+		{...createTransaction.fields.description.as('text')}
 		label="Description (optional)"
-		bind:value={description}
 		placeholder="What was this for?"
 	/>
 
-	<Input type="date" label="Date" bind:value={date} required />
+	<Input
+		{...createTransaction.fields.date.as('date')}
+		label="Date"
+		value={new Date().toISOString().split('T')[0]}
+		required
+	/>
 
-	<Button type="submit" variant="primary" class="w-full" {loading}>
+	<div class="form-control">
+		<div class="label">
+			<span class="label-text">Receipt (optional)</span>
+		</div>
+		<input
+			{...createTransaction.fields.receipt.as('file')}
+			accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+			class="file-input file-input-bordered w-full"
+		/>
+	</div>
+
+	<Button type="submit" variant="primary" class="w-full" loading={!!createTransaction.pending}>
 		Add Transaction
 	</Button>
 </form>

@@ -99,6 +99,7 @@ export const TransactionSchema = z.object({
 	amount: z.number(),
 	description: z.string(),
 	date: z.string(),
+	receipt: z.string().catch(''),
 	created: z.string()
 });
 

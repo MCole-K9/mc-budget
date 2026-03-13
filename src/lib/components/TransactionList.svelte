@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { PUBLIC_POCKETBASE_URL } from '$env/static/public';
 	import type { Transaction, Wallet } from '$lib/types/budget';
 
 	interface Props {
@@ -30,6 +31,11 @@
 		);
 		return category?.color || '#6B7280';
 	}
+
+	function getReceiptUrl(transaction: Transaction): string | null {
+		if (!transaction.receipt) return null;
+		return `${PUBLIC_POCKETBASE_URL}/api/files/transactions/${transaction.id}/${transaction.receipt}`;
+	}
 </script>
 
 {#if transactions.length === 0}
@@ -40,6 +46,7 @@
 {:else}
 	<div class="divide-y divide-base-300">
 		{#each transactions as transaction (transaction.id)}
+			{@const receiptUrl = getReceiptUrl(transaction)}
 			<div class="flex items-center justify-between py-3">
 				<div class="flex items-center gap-3">
 					<span
@@ -61,6 +68,17 @@
 					>
 						{transaction.amount < 0 ? '-' : '+'}{formatCurrency(transaction.amount)}
 					</span>
+					{#if receiptUrl}
+						<a
+							href={receiptUrl}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="btn btn-ghost btn-xs text-base-content/50"
+							title="View receipt"
+						>
+							🧾
+						</a>
+					{/if}
 					{#if ondelete}
 						<button
 							class="btn btn-ghost btn-xs text-error"

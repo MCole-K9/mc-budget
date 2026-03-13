@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { query, command } from '$app/server';
+import { query, command, form } from '$app/server';
+import { invalid } from '@sveltejs/kit';
 import { getPb } from '$lib/server/db';
-import { CreateTransactionInputSchema, TransactionSchema, WalletSchema } from '$lib/schemas/budget';
+import { TransactionSchema, WalletSchema } from '$lib/schemas/budget';
 import { getWallet } from '$lib/wallets.remote';
 
 export const getTransactions = query(z.string(), async (walletId) => {
@@ -12,41 +13,59 @@ export const getTransactions = query(z.string(), async (walletId) => {
 	return records.map((r) => TransactionSchema.parse(r));
 });
 
-const CreateTransactionWithWalletSchema = z.object({
-	input: CreateTransactionInputSchema,
-	wallet: WalletSchema
+const CreateTransactionFormSchema = z.object({
+	walletId: z.string().min(1, 'Wallet ID required'),
+	isExpense: z.string(),
+	category: z.string().optional().default(''),
+	incomeSource: z.string().optional(),
+	amount: z.number().gt(0, 'Amount must be greater than 0'),
+	description: z.string().optional(),
+	date: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid date format'),
+	receipt: z.instanceof(File).optional()
 });
 
-export const createTransaction = command(
-	CreateTransactionWithWalletSchema,
-	async ({ input, wallet }) => {
-		const isExpense = input.amount < 0;
-		if (isExpense) {
-			const categoryExists = wallet.categories.some(
-				(c) => c.name.toLowerCase() === input.category.toLowerCase()
-			);
-			if (!categoryExists) {
-				throw new Error(`Category "${input.category}" does not exist in this wallet`);
-			}
+export const createTransaction = form(CreateTransactionFormSchema, async (input) => {
+	const pb = getPb();
+	const walletRecord = await pb.collection('wallets').getOne(input.walletId);
+	const wallet = WalletSchema.parse(walletRecord);
+
+	const isExpense = input.isExpense === 'true';
+	const finalAmount = isExpense ? -Math.abs(input.amount) : Math.abs(input.amount);
+	const finalCategory = isExpense
+		? input.category || ''
+		: input.incomeSource?.trim() || 'Income';
+
+	if (isExpense) {
+		const categoryExists = wallet.categories.some(
+			(c) => c.name.toLowerCase() === (input.category || '').toLowerCase()
+		);
+		if (!categoryExists) {
+			invalid(`Category "${input.category}" does not exist in this wallet`);
 		}
-
-		const record = await getPb().collection('transactions').create({
-			wallet: input.wallet,
-			category: input.category,
-			amount: input.amount,
-			description: input.description?.trim() || '',
-			date: input.date
-		});
-
-		await getPb()
-			.collection('wallets')
-			.update(input.wallet, { balance: wallet.balance + input.amount });
-
-		getTransactions(input.wallet).refresh();
-		getWallet(input.wallet).refresh();
-		return TransactionSchema.parse(record);
 	}
-);
+
+	const formData = new FormData();
+	formData.append('wallet', input.walletId);
+	formData.append('category', finalCategory);
+	formData.append('amount', String(finalAmount));
+	formData.append('description', input.description?.trim() || '');
+	formData.append('date', input.date);
+
+	if (input.receipt instanceof File && input.receipt.size > 0) {
+		formData.append('receipt', input.receipt);
+	}
+
+	const record = await pb.collection('transactions').create(formData);
+
+	await pb.collection('wallets').update(input.walletId, {
+		balance: wallet.balance + finalAmount
+	});
+
+	getTransactions(input.walletId).refresh();
+	getWallet(input.walletId).refresh();
+
+	return TransactionSchema.parse(record);
+});
 
 export const deleteTransaction = command(
 	z.object({ id: z.string(), walletId: z.string() }),

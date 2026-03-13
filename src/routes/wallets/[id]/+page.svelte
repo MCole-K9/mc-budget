@@ -3,12 +3,8 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { getWallet, deleteWallet, recalculateBalance } from '$lib/wallets.remote';
-	import {
-		getTransactions,
-		createTransaction,
-		deleteTransaction as removeTransaction
-	} from '$lib/transactions.remote';
-	import type { Transaction, CreateTransactionInput } from '$lib/types/budget';
+	import { getTransactions, deleteTransaction as removeTransaction } from '$lib/transactions.remote';
+	import type { Transaction } from '$lib/types/budget';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -20,27 +16,12 @@
 	let showAddTransaction = $state(false);
 	let showDeleteConfirm = $state(false);
 	let transactionToDelete = $state<Transaction | null>(null);
-	let transactionLoading = $state(false);
 	let reconciling = $state(false);
 	let error = $state('');
 
 	const walletId = page.params.id!;
 	const wallet = $derived(await getWallet(walletId));
 	const transactions = $derived(await getTransactions(walletId));
-
-	async function handleAddTransaction(input: CreateTransactionInput) {
-		transactionLoading = true;
-		error = '';
-
-		try {
-			await createTransaction({ input, wallet });
-			showAddTransaction = false;
-		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to add transaction';
-		} finally {
-			transactionLoading = false;
-		}
-	}
 
 	function handleDeleteTransaction(transaction: Transaction) {
 		transactionToDelete = transaction;
@@ -203,11 +184,7 @@
 		<!-- Add Transaction Modal -->
 		<Modal bind:open={showAddTransaction} title="Add Transaction">
 			{#snippet children()}
-				<TransactionForm
-					{wallet}
-					onsubmit={handleAddTransaction}
-					loading={transactionLoading}
-				/>
+				<TransactionForm {wallet} onSuccess={() => (showAddTransaction = false)} />
 			{/snippet}
 		</Modal>
 
