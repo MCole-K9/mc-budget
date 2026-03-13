@@ -75,6 +75,12 @@
 	function getCategoryAmount(balance: number, percentage: number): number {
 		return (balance * percentage) / 100;
 	}
+
+	function getCategorySpent(categoryName: string): number {
+		return transactions
+			.filter((t) => t.category.toLowerCase() === categoryName.toLowerCase() && t.amount < 0)
+			.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+	}
 </script>
 
 <svelte:head>
@@ -112,23 +118,37 @@
 			<!-- Budget Allocation -->
 			<Card title="Budget Allocation">
 				{#snippet children()}
-					<div class="space-y-3">
+					<div class="space-y-4">
 						{#each wallet.categories as category (category.name)}
-							<div class="flex items-center justify-between">
-								<div class="flex items-center gap-2">
-									<span
-										class="w-4 h-4 rounded"
-										style="background-color: {category.color};"
-									></span>
-									<span class="font-medium">{category.name}</span>
-									<span class="text-base-content/60">({category.percentage}%)</span>
+							{@const remaining = getCategoryAmount(wallet.balance, category.percentage)}
+							{@const spent = getCategorySpent(category.name)}
+							{@const total = remaining + spent}
+							{@const spentPct = total > 0 ? (spent / total) * 100 : 0}
+							<div class="space-y-1">
+								<div class="flex items-center justify-between">
+									<div class="flex items-center gap-2">
+										<span
+											class="w-4 h-4 rounded"
+											style="background-color: {category.color};"
+										></span>
+										<span class="font-medium">{category.name}</span>
+										<span class="text-base-content/60">{category.percentage}%</span>
+									</div>
+									<span class="font-semibold">
+										{formatCurrency(remaining, wallet.currency)} left
+									</span>
 								</div>
-								<span class="font-semibold">
-									{formatCurrency(
-										getCategoryAmount(wallet.balance, category.percentage),
-										wallet.currency
-									)}
-								</span>
+								<div class="flex items-center gap-2 pl-6">
+									<div class="flex-1 h-2 rounded-full bg-base-300 overflow-hidden">
+										<div
+											class="h-full rounded-full transition-all"
+											style="width: {spentPct}%; background-color: {category.color}; opacity: 0.7;"
+										></div>
+									</div>
+									<span class="text-xs text-base-content/60 shrink-0">
+										{formatCurrency(spent, wallet.currency)} spent
+									</span>
+								</div>
 							</div>
 						{/each}
 					</div>
