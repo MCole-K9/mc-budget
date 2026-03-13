@@ -1,54 +1,37 @@
-import { prerender } from '$app/server';
-import { pb } from '$lib/server/db';
-import { BudgetPresetSchema, type BudgetPreset } from '$lib/schemas/budget';
+import { z } from 'zod';
+import { query, command } from '$app/server';
+import { getPb } from '$lib/server/db';
+import { BudgetPresetSchema, BudgetCategoriesSchema } from '$lib/schemas/budget';
 
-const DEFAULT_PRESETS: BudgetPreset[] = [
-	{
-		id: 'preset-50-30-20',
-		name: '50/30/20 Rule',
-		description:
-			'A simple budgeting method: 50% for needs, 30% for wants, and 20% for savings and debt repayment.',
-		categories: [
-			{ name: 'Needs', percentage: 50, color: '#3B82F6' },
-			{ name: 'Wants', percentage: 30, color: '#8B5CF6' },
-			{ name: 'Savings', percentage: 20, color: '#10B981' }
-		]
-	},
-	{
-		id: 'preset-zero-based',
-		name: 'Zero-Based Budget',
-		description:
-			'Every dollar has a job. Allocate all income across detailed categories for precise control.',
-		categories: [
-			{ name: 'Housing', percentage: 25, color: '#3B82F6' },
-			{ name: 'Transportation', percentage: 15, color: '#8B5CF6' },
-			{ name: 'Food', percentage: 15, color: '#10B981' },
-			{ name: 'Utilities', percentage: 10, color: '#F59E0B' },
-			{ name: 'Insurance', percentage: 10, color: '#EF4444' },
-			{ name: 'Savings', percentage: 10, color: '#06B6D4' },
-			{ name: 'Personal', percentage: 10, color: '#EC4899' },
-			{ name: 'Entertainment', percentage: 5, color: '#6366F1' }
-		]
-	},
-	{
-		id: 'preset-envelope',
-		name: 'Envelope System',
-		description:
-			'A simplified approach dividing money into three main envelopes for easy management.',
-		categories: [
-			{ name: 'Essentials', percentage: 60, color: '#3B82F6' },
-			{ name: 'Financial Goals', percentage: 20, color: '#10B981' },
-			{ name: 'Lifestyle', percentage: 20, color: '#8B5CF6' }
-		]
-	}
-];
+export const getPresets = query(async () => {
+	const records = await getPb().collection('presets').getFullList({ sort: 'name' });
+	return records.map((r) => BudgetPresetSchema.parse(r));
+});
 
-export const getPresets = prerender(async () => {
-	try {
-		const records = await pb.collection('presets').getFullList({ sort: 'name' });
-		const dbPresets = records.map((r) => BudgetPresetSchema.parse(r));
-		return [...DEFAULT_PRESETS, ...dbPresets];
-	} catch {
-		return DEFAULT_PRESETS;
-	}
+const CreatePresetInputSchema = z.object({
+	name: z.string().min(1, 'Name is required').max(100),
+	description: z.string().max(500).default(''),
+	categories: BudgetCategoriesSchema
+});
+
+export const createPreset = command(CreatePresetInputSchema, async (input) => {
+	const pb = getPb();
+	const user = pb.authStore.record;
+	if (!user) throw new Error('Must be authenticated to create a preset');
+
+	const record = await pb.collection('presets').create({
+		name: input.name.trim(),
+		description: input.description,
+		categories: input.categories,
+		user: user.id
+	});
+
+	getPresets().refresh();
+	return BudgetPresetSchema.parse(record);
+});
+
+export const deletePreset = command(z.string(), async (id) => {
+	await getPb().collection('presets').delete(id);
+	getPresets().refresh();
+	return { success: true };
 });

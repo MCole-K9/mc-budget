@@ -108,7 +108,8 @@ export const BudgetPresetSchema = z.object({
 	id: z.string(),
 	name: z.string(),
 	description: z.string(),
-	categories: z.array(BudgetCategorySchema)
+	categories: z.array(BudgetCategorySchema),
+	user: z.string().optional()
 });
 
 export type BudgetPreset = z.infer<typeof BudgetPresetSchema>;
