@@ -13,7 +13,7 @@
 	let { wallet, onSuccess }: Props = $props();
 
 	let isExpense = $state(true);
-	let lastResultId = $state('');
+	let lastResultId = $state(createTransaction.result?.id ?? '');
 
 	const categoryOptions = $derived(
 		wallet.categories.map((c) => ({ value: c.name, label: c.name }))
