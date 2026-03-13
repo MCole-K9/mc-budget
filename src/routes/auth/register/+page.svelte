@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { register } from '$lib/auth.remote';
+	import { resolve } from '$app/paths';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import Alert from '$lib/components/Alert.svelte';
@@ -89,7 +90,7 @@
 
 		<p class="text-center mt-4 text-sm text-base-content/70">
 			Already have an account?
-			<a href="/auth/login" class="link link-primary">Sign in</a>
+			<a href={resolve('/auth/login')} class="link link-primary">Sign in</a>
 		</p>
 	</Card>
 </div>

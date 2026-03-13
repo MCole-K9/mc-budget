@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { getWallet, deleteWallet } from '$lib/wallets.remote';
 	import {
 		getTransactions,
@@ -50,7 +51,7 @@
 	async function handleDeleteWallet() {
 		try {
 			await deleteWallet(wallet.id);
-			await goto('/wallets');
+			await goto(resolve('/wallets'));
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to delete wallet';
 		}
@@ -84,7 +85,7 @@
 			<!-- Header -->
 			<div class="flex justify-between items-start">
 				<div>
-					<a href="/wallets" class="btn btn-ghost btn-sm mb-2">&larr; Back to Wallets</a>
+					<a href={resolve('/wallets')} class="btn btn-ghost btn-sm mb-2">&larr; Back to Wallets</a>
 					<h1 class="text-3xl font-bold">{wallet.name}</h1>
 					<p class="text-4xl font-bold text-primary mt-2">
 						{formatCurrency(wallet.balance, wallet.currency)}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { auth } from '$lib/stores/auth.svelte';
 
 	interface Props {
@@ -9,7 +10,7 @@
 		redirectTo?: string;
 	}
 
-	let { children, fallback, redirectTo = '/auth/login' }: Props = $props();
+	let { children, fallback, redirectTo = resolve('/auth/login') }: Props = $props();
 
 	$effect(() => {
 		if (!auth.isLoading && !auth.isAuthenticated) {

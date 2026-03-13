@@ -2,6 +2,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Card from '$lib/components/Card.svelte';
+	import { resolve } from '$app/paths';
 </script>
 
 <div class="max-w-4xl mx-auto">
@@ -12,7 +13,7 @@
 		</div>
 
 		<div class="grid gap-6 md:grid-cols-2">
-			<a href="/wallets">
+			<a href={resolve('/wallets')}>
 				<Card class="h-full hover:shadow-lg transition-shadow">
 					{#snippet children()}
 						<h2 class="text-2xl font-semibold mb-2">My Wallets</h2>
@@ -21,7 +22,7 @@
 				</Card>
 			</a>
 
-			<a href="/wallets/new">
+			<a href={resolve('/wallets/new')}>
 				<Card class="h-full hover:shadow-lg transition-shadow">
 					{#snippet children()}
 						<h2 class="text-2xl font-semibold mb-2">Create Wallet</h2>
@@ -30,7 +31,7 @@
 				</Card>
 			</a>
 
-			<a href="/presets">
+			<a href={resolve('/presets')}>
 				<Card class="h-full hover:shadow-lg transition-shadow">
 					{#snippet children()}
 						<h2 class="text-2xl font-semibold mb-2">Budget Presets</h2>
@@ -49,10 +50,10 @@
 						choose from proven budget templates, and track every transaction.
 					</p>
 					<div class="flex gap-4 justify-center">
-						<a href="/auth/register">
+						<a href={resolve('/auth/register')}>
 							<Button variant="primary" size="lg">Get Started</Button>
 						</a>
-						<a href="/auth/login">
+						<a href={resolve('/auth/login')}>
 							<Button variant="ghost" size="lg">Sign In</Button>
 						</a>
 					</div>

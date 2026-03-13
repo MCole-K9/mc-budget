@@ -5,6 +5,7 @@
 	import { auth } from '$lib/stores/auth.svelte';
 	import { logout } from '$lib/auth.remote';
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	let { data, children } = $props();
 
@@ -15,7 +16,7 @@
 	async function handleLogout() {
 		await logout();
 		auth.clear();
-		await goto('/auth/login');
+		await goto(resolve('/auth/login'));
 	}
 </script>
 
@@ -27,12 +28,12 @@
 <div class="min-h-screen bg-base-200">
 	<nav class="navbar bg-base-100 shadow-sm">
 		<div class="flex-1">
-			<a href="/" class="btn btn-ghost text-xl">MC Budget</a>
+			<a href={resolve('/')} class="btn btn-ghost text-xl">MC Budget</a>
 		</div>
 		<div class="flex-none gap-2">
 			{#if auth.isAuthenticated}
-				<a href="/wallets" class="btn btn-ghost btn-sm">Wallets</a>
-				<a href="/presets" class="btn btn-ghost btn-sm">Presets</a>
+				<a href={resolve('/wallets')} class="btn btn-ghost btn-sm">Wallets</a>
+				<a href={resolve('/presets')} class="btn btn-ghost btn-sm">Presets</a>
 				<div class="dropdown dropdown-end">
 					<div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar placeholder">
 						<div class="bg-neutral text-neutral-content w-10 rounded-full">
@@ -49,8 +50,8 @@
 					</ul>
 				</div>
 			{:else}
-				<a href="/auth/login" class="btn btn-ghost btn-sm">Login</a>
-				<a href="/auth/register" class="btn btn-primary btn-sm">Sign Up</a>
+				<a href={resolve('/auth/login')} class="btn btn-ghost btn-sm">Login</a>
+				<a href={resolve('/auth/register')} class="btn btn-primary btn-sm">Sign Up</a>
 			{/if}
 			<ThemeToggle />
 		</div>

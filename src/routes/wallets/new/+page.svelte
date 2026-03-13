@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { createWallet } from '$lib/wallets.remote';
 	import { getPresets } from '$lib/presets.remote';
 	import type { BudgetPreset, BudgetCategory } from '$lib/types/budget';
@@ -66,7 +67,7 @@
 				currency,
 				categories
 			});
-			await goto(`/wallets/${wallet.id}`);
+			await goto(resolve('/wallets/[id]', { id: wallet.id }));
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to create wallet';
 		} finally {

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { command, form, getRequestEvent } from '$app/server';
 import { redirect, invalid } from '@sveltejs/kit';
+import { resolve } from '$app/paths';
 import { getPb } from '$lib/server/db';
 import { LoginInputSchema, RegisterInputSchema } from '$lib/schemas/budget';
 
@@ -13,7 +14,7 @@ export const login = form(LoginInputSchema, async (input) => {
 	} catch {
 		invalid('Invalid email or password');
 	}
-	redirect(303, '/wallets');
+	redirect(303, resolve('/wallets'));
 });
 
 /**
@@ -35,7 +36,7 @@ export const register = form(RegisterInputSchema, async (input) => {
 	}
 
 	await getPb().collection('users').authWithPassword(input.email, input.password);
-	redirect(303, '/wallets');
+	redirect(303, resolve('/wallets'));
 });
 
 /**

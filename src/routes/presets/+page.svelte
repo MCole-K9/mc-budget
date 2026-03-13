@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { getPresets } from '$lib/presets.remote';
 	import type { BudgetPreset } from '$lib/types/budget';
 	import Card from '$lib/components/Card.svelte';
@@ -8,7 +9,7 @@
 	const presets = await getPresets();
 
 	function usePreset(preset: BudgetPreset) {
-		goto('/wallets/new');
+		goto(resolve('/wallets/new'));
 	}
 </script>
 
