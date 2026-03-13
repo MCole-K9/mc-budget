@@ -13,6 +13,33 @@ export const getTransactions = query(z.string(), async (walletId) => {
 	return records.map((r) => TransactionSchema.parse(r));
 });
 
+const GetTransactionsPagedSchema = z.object({
+	walletId: z.string(),
+	page: z.number().default(1),
+	perPage: z.number().default(15),
+	month: z.number().min(0).max(11),
+	year: z.number()
+});
+
+export const getTransactionsPaged = query(GetTransactionsPagedSchema, async (input) => {
+	const mm = String(input.month + 1).padStart(2, '0');
+	const startDate = `${input.year}-${mm}-01`;
+	const lastDay = new Date(input.year, input.month + 1, 0).getDate();
+	const endDate = `${input.year}-${mm}-${String(lastDay).padStart(2, '0')}`;
+
+	const result = await getPb().collection('transactions').getList(input.page, input.perPage, {
+		filter: `wallet = "${input.walletId}" && date >= "${startDate}" && date <= "${endDate}"`,
+		sort: '-date,-created'
+	});
+
+	return {
+		items: result.items.map((r) => TransactionSchema.parse(r)),
+		totalItems: result.totalItems,
+		totalPages: result.totalPages,
+		page: result.page
+	};
+});
+
 const CreateTransactionFormSchema = z.object({
 	walletId: z.string().min(1, 'Wallet ID required'),
 	isExpense: z.string(),

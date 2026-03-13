@@ -3,7 +3,11 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { getWallet, deleteWallet, recalculateBalance } from '$lib/wallets.remote';
-	import { getTransactions, deleteTransaction as removeTransaction } from '$lib/transactions.remote';
+	import {
+		getTransactions,
+		getTransactionsPaged,
+		deleteTransaction as removeTransaction
+	} from '$lib/transactions.remote';
 	import type { Transaction } from '$lib/types/budget';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import Card from '$lib/components/Card.svelte';
@@ -19,10 +23,66 @@
 	let reconciling = $state(false);
 	let error = $state('');
 
+	let filterMonth = $state(new Date().getMonth());
+	let filterYear = $state(new Date().getFullYear());
+	let currentPage = $state(1);
+	const PER_PAGE = 15;
+
+	const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 	const walletId = page.params.id!;
+
+	// All transactions — used for budget allocation card and CSV export
 	const [wallet, transactions] = $derived(
 		await Promise.all([getWallet(walletId), getTransactions(walletId)])
 	);
+
+	// Server-filtered + paginated — used for the transaction list only
+	const pagedResult = $derived(
+		await getTransactionsPaged({ walletId, page: currentPage, perPage: PER_PAGE, month: filterMonth, year: filterYear })
+	);
+
+	function refreshPagedQuery() {
+		getTransactionsPaged({ walletId, page: currentPage, perPage: PER_PAGE, month: filterMonth, year: filterYear }).refresh();
+	}
+
+	function prevMonth() {
+		if (filterMonth === 0) { filterMonth = 11; filterYear--; }
+		else filterMonth--;
+		currentPage = 1;
+	}
+
+	function nextMonth() {
+		if (filterMonth === 11) { filterMonth = 0; filterYear++; }
+		else filterMonth++;
+		currentPage = 1;
+	}
+
+	// CSV exports the current month's transactions (from all-transactions cache, filtered client-side)
+	function exportCsv() {
+		const monthTransactions = transactions.filter((t) => {
+			const d = new Date(t.date);
+			return d.getMonth() === filterMonth && d.getFullYear() === filterYear;
+		});
+		const rows = [
+			['Date', 'Category', 'Description', 'Amount', 'Currency'],
+			...monthTransactions.map((t) => [
+				t.date,
+				t.category,
+				t.description || '',
+				t.amount.toFixed(2),
+				wallet.currency
+			])
+		];
+		const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+		const blob = new Blob([csv], { type: 'text/csv' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `${wallet.name}-${MONTHS[filterMonth]}-${filterYear}.csv`;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
 
 	function handleDeleteTransaction(transaction: Transaction) {
 		transactionToDelete = transaction;
@@ -33,6 +93,7 @@
 		try {
 			await removeTransaction({ id: transactionToDelete.id, walletId: transactionToDelete.wallet });
 			transactionToDelete = null;
+			refreshPagedQuery();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to delete transaction';
 			transactionToDelete = null;
@@ -52,6 +113,7 @@
 		reconciling = true;
 		try {
 			await recalculateBalance(walletId);
+			refreshPagedQuery();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to recalculate balance';
 		} finally {
@@ -60,16 +122,14 @@
 	}
 
 	function formatCurrency(amount: number, currency: string): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency
-		}).format(amount);
+		return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 	}
 
 	function getCategoryAmount(balance: number, percentage: number): number {
 		return (balance * percentage) / 100;
 	}
 
+	// All-time spending per category (uses full transaction list)
 	function getCategorySpent(categoryName: string): number {
 		return transactions
 			.filter((t) => t.category.toLowerCase() === categoryName.toLowerCase() && t.amount < 0)
@@ -178,11 +238,44 @@
 			<!-- Transactions -->
 			<Card title="Transactions">
 				{#snippet children()}
+					<!-- Month filter + export -->
+					<div class="flex items-center justify-between mb-4">
+						<div class="flex items-center gap-1">
+							<button class="btn btn-ghost btn-sm" onclick={prevMonth}>&larr;</button>
+							<span class="font-medium w-28 text-center">{MONTHS[filterMonth]} {filterYear}</span>
+							<button class="btn btn-ghost btn-sm" onclick={nextMonth}>&rarr;</button>
+						</div>
+						{#if pagedResult.totalItems > 0}
+							<button class="btn btn-ghost btn-sm" onclick={exportCsv} title="Export as CSV">
+								↓ CSV
+							</button>
+						{/if}
+					</div>
+
 					<TransactionList
-						transactions={transactions}
+						transactions={pagedResult.items}
 						{wallet}
 						ondelete={handleDeleteTransaction}
 					/>
+
+					<!-- Pagination -->
+					{#if pagedResult.totalPages > 1}
+						<div class="flex items-center justify-center gap-3 mt-4 pt-4 border-t border-base-300">
+							<button
+								class="btn btn-ghost btn-sm"
+								disabled={currentPage === 1}
+								onclick={() => currentPage--}
+							>&larr;</button>
+							<span class="text-sm text-base-content/70">
+								{currentPage} / {pagedResult.totalPages}
+							</span>
+							<button
+								class="btn btn-ghost btn-sm"
+								disabled={currentPage === pagedResult.totalPages}
+								onclick={() => currentPage++}
+							>&rarr;</button>
+						</div>
+					{/if}
 				{/snippet}
 			</Card>
 		</div>
@@ -190,7 +283,13 @@
 		<!-- Add Transaction Modal -->
 		<Modal bind:open={showAddTransaction} title="Add Transaction">
 			{#snippet children()}
-				<TransactionForm {wallet} onSuccess={() => (showAddTransaction = false)} />
+				<TransactionForm
+					{wallet}
+					onSuccess={() => {
+						showAddTransaction = false;
+						refreshPagedQuery();
+					}}
+				/>
 			{/snippet}
 		</Modal>
 
