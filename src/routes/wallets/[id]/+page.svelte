@@ -205,6 +205,22 @@
 		if (selectedPeriod === sp.name) setPeriod('this-month');
 	}
 
+	function jumpToCycleForDate(dateStr: string) {
+		if (!dateStr) return;
+		const d = new Date(dateStr + 'T00:00:00');
+		const now = new Date();
+		const day = Math.min(cycleStartDay, 28);
+		// Cycle ends in d's month if d.date < day, otherwise in d's month + 1
+		let endMonth = d.getMonth();
+		let endYear = d.getFullYear();
+		if (d.getDate() >= day) {
+			endMonth++;
+			if (endMonth > 11) { endMonth = 0; endYear++; }
+		}
+		cycleOffset = (endYear - now.getFullYear()) * 12 + (endMonth - now.getMonth());
+		currentPage = 1;
+	}
+
 	async function handleSaveCycleDay() {
 		const day = Math.max(1, Math.min(28, Math.round(cycleStartDayInput)));
 		cycleStartDay = day;
@@ -457,7 +473,7 @@
 
 						<!-- Pay cycle day config -->
 						{#if selectedPeriod === 'pay-cycle'}
-							<div class="flex items-center gap-2">
+							<div class="flex items-center gap-2 flex-wrap">
 								<button
 									class="btn btn-ghost btn-sm"
 									onclick={() => { cycleOffset--; currentPage = 1; }}
@@ -475,6 +491,12 @@
 										onclick={() => { cycleOffset = 0; currentPage = 1; }}
 									>today</button>
 								{/if}
+								<input
+									type="date"
+									class="input input-bordered input-xs w-32 text-xs ml-auto"
+									title="Jump to cycle containing this date"
+									onchange={(e) => jumpToCycleForDate(e.currentTarget.value)}
+								/>
 							</div>
 							<div class="flex items-center gap-2 text-sm">
 								<span class="text-base-content/60 shrink-0">Cycle starts on day</span>
