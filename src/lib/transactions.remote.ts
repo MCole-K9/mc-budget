@@ -26,7 +26,8 @@ export const getTransactionSummary = query(GetTransactionSummarySchema, async (i
 
 	const records = await getPb().collection('transactions').getFullList({
 		filter,
-		fields: 'amount,category'
+		fields: 'amount,category',
+		requestKey: null
 	});
 
 	let income = 0;
