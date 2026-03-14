@@ -9,12 +9,15 @@ const guestOnlyRoutes: string[] = [resolve('/auth/login'), resolve('/auth/regist
 function isProtectedRoute(pathname: string) {
 	const walletsPath = resolve('/wallets');
 	const presetsPath = resolve('/presets');
+	const transactionsPath = resolve('/transactions');
 
 	return (
 		pathname === walletsPath ||
 		pathname.startsWith(`${walletsPath}/`) ||
 		pathname === presetsPath ||
-		pathname.startsWith(`${presetsPath}/`)
+		pathname.startsWith(`${presetsPath}/`) ||
+		pathname === transactionsPath ||
+		pathname.startsWith(`${transactionsPath}/`)
 	);
 }
 

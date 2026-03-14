@@ -33,6 +33,7 @@
 		<div class="flex-none gap-2">
 			{#if auth.isAuthenticated}
 				<a href={resolve('/wallets')} class="btn btn-ghost btn-sm">Wallets</a>
+				<a href={resolve('/transactions')} class="btn btn-ghost btn-sm">Transactions</a>
 				<a href={resolve('/presets')} class="btn btn-ghost btn-sm">Presets</a>
 				<div class="dropdown dropdown-end">
 					<div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar placeholder">

@@ -73,6 +73,77 @@ export const getTransactionsPaged = query(GetTransactionsPagedSchema, async (inp
 	};
 });
 
+const GetAllTransactionsPagedSchema = z.object({
+	page: z.number().default(1),
+	perPage: z.number().default(25),
+	startDate: z.string().optional(),
+	endDate: z.string().optional()
+});
+
+export const getAllTransactionsPaged = query(GetAllTransactionsPagedSchema, async (input) => {
+	let filter = '';
+	if (input.startDate) filter += `date >= "${input.startDate}"`;
+	if (input.endDate) filter += (filter ? ' && ' : '') + `date <= "${input.endDate}"`;
+
+	const result = await getPb().collection('transactions').getList(input.page, input.perPage, {
+		filter: filter || undefined,
+		sort: '-date,-created',
+		expand: 'wallet',
+		requestKey: null
+	});
+
+	return {
+		items: result.items.map((r) => {
+			const tx = TransactionSchema.parse(r);
+			const w = r.expand?.['wallet'] as Record<string, unknown> | undefined;
+			const cats = Array.isArray(w?.categories)
+				? (w.categories as { name: string; color: string }[])
+				: [];
+			const catColor = cats.find((c) => c.name.toLowerCase() === tx.category.toLowerCase())?.color ?? null;
+			return {
+				...tx,
+				date: tx.date.split('T')[0].split(' ')[0],
+				walletName: String(w?.name ?? ''),
+				currency: String(w?.currency ?? ''),
+				categoryColor: catColor
+			};
+		}),
+		totalItems: result.totalItems,
+		totalPages: result.totalPages,
+		page: result.page
+	};
+});
+
+const GetAllTransactionsSummarySchema = z.object({
+	startDate: z.string().optional(),
+	endDate: z.string().optional()
+});
+
+export const getAllTransactionsSummary = query(GetAllTransactionsSummarySchema, async (input) => {
+	let filter = '';
+	if (input.startDate) filter += `date >= "${input.startDate}"`;
+	if (input.endDate) filter += (filter ? ' && ' : '') + `date <= "${input.endDate}"`;
+
+	const records = await getPb().collection('transactions').getFullList({
+		filter: filter || undefined,
+		fields: 'amount,wallet',
+		expand: 'wallet',
+		requestKey: null
+	});
+
+	const byCurrency: Record<string, { income: number; expense: number }> = {};
+	for (const r of records) {
+		const amount = Number(r.amount) || 0;
+		const w = r.expand?.['wallet'] as Record<string, unknown> | undefined;
+		const currency = String(w?.currency ?? 'USD');
+		if (!byCurrency[currency]) byCurrency[currency] = { income: 0, expense: 0 };
+		if (amount > 0) byCurrency[currency].income += amount;
+		else byCurrency[currency].expense += Math.abs(amount);
+	}
+
+	return { byCurrency };
+});
+
 const CreateTransactionFormSchema = z.object({
 	walletId: z.string().min(1, 'Wallet ID required'),
 	isExpense: z.string(),
