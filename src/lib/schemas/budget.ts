@@ -4,6 +4,7 @@ import { z } from 'zod';
 export const BudgetCategorySchema = z.object({
 	name: z.string().min(1, 'Category name is required').max(100),
 	percentage: z.number().min(0).max(100),
+	fixedAmount: z.number().min(0).optional(),
 	color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Color must be a valid hex color (#RRGGBB)')
 });
 
@@ -37,7 +38,8 @@ export const CreateWalletInputSchema = z.object({
 		.length(3, 'Currency must be a 3-letter code')
 		.regex(/^[A-Z]{3}$/, 'Currency must be uppercase letters')
 		.transform((v) => v.toUpperCase()),
-	categories: BudgetCategoriesSchema
+	budget_type: z.enum(['percentage', 'fixed']).default('percentage'),
+	categories: z.array(BudgetCategorySchema).min(1, 'At least one category is required')
 });
 
 export type CreateWalletInput = z.infer<typeof CreateWalletInputSchema>;
@@ -106,6 +108,7 @@ export const WalletSchema = z.object({
 	default_period: z.string().catch(''),
 	saved_periods: z.array(SavedPeriodSchema).catch([]),
 	cycle_start_day: z.number().catch(1),
+	budget_type: z.enum(['percentage', 'fixed']).catch('percentage'),
 	created: z.string(),
 	updated: z.string()
 });

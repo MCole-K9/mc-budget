@@ -146,6 +146,7 @@
 		walletData ? (() => {
 			const spendingInPeriod = report.byCurrency[walletData.currency] ?? { income: 0, expense: 0 };
 			const periodIncome = spendingInPeriod.income;
+			const isFixed = walletData.budget_type === 'fixed';
 			const cats = walletData.categories;
 			return {
 				type: 'bar',
@@ -154,7 +155,7 @@
 					datasets: [
 						{
 							label: 'Budget',
-							data: cats.map(c => (periodIncome * c.percentage) / 100),
+							data: cats.map(c => isFixed ? (c.fixedAmount ?? 0) : (periodIncome * c.percentage) / 100),
 							backgroundColor: cats.map(c => c.color + '44'),
 							borderColor: cats.map(c => c.color),
 							borderWidth: 1,

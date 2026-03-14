@@ -269,8 +269,11 @@
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 	}
 
-	function getCategoryAmount(balance: number, percentage: number): number {
-		return (balance * percentage) / 100;
+	function getCategoryAmount(category: typeof wallet.categories[number]): number {
+		if (wallet.budget_type === "fixed") {
+			return category.fixedAmount ?? 0;
+		}
+		return (periodIncome * category.percentage) / 100;
 	}
 
 	function inDateRange(date: string): boolean {
@@ -345,19 +348,23 @@
 			<!-- Budget Allocation -->
 			<Card title="Budget Allocation">
 				{#snippet children()}
-					<!-- Period income summary -->
-					<div class="flex justify-between items-center mb-5 pb-4 border-b border-base-200">
-						<span class="text-xs font-medium text-base-content/40 uppercase tracking-wider">Income · {periodLabel}</span>
-						<span class="text-sm font-semibold">{formatCurrency(periodIncome, wallet.currency)}</span>
-					</div>
-					{#if periodIncome === 0 && selectedPeriod !== 'all-time'}
-						<div class="text-xs text-base-content/40 text-center py-2">
-							No income this period. Switch to All Time to see full allocation.
+					<!-- Period income summary (percentage wallets only) -->
+					{#if wallet.budget_type !== 'fixed'}
+						<div class="flex justify-between items-center mb-5 pb-4 border-b border-base-200">
+							<span class="text-xs font-medium text-base-content/40 uppercase tracking-wider">Income · {periodLabel}</span>
+							<span class="text-sm font-semibold">{formatCurrency(periodIncome, wallet.currency)}</span>
 						</div>
+						{#if periodIncome === 0 && selectedPeriod !== 'all-time'}
+							<div class="text-xs text-base-content/40 text-center py-2">
+								No income this period. Switch to All Time to see full allocation.
+							</div>
+						{/if}
+					{:else}
+						<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-5 pb-4 border-b border-base-200">Fixed monthly limits</p>
 					{/if}
 					<div class="space-y-4">
 						{#each wallet.categories as category (category.name)}
-							{@const allocated = getCategoryAmount(periodIncome, category.percentage)}
+							{@const allocated = getCategoryAmount(category)}
 							{@const spent = getCategorySpent(category.name)}
 							{@const remaining = allocated - spent}
 							{@const spentPct = allocated > 0 ? Math.min(100, (spent / allocated) * 100) : 0}
@@ -370,7 +377,7 @@
 											style="background-color: {category.color};"
 										></span>
 										<span class="font-medium">{category.name}</span>
-										<span class="text-base-content/60">{category.percentage}%</span>
+										{#if wallet.budget_type !== "fixed"}<span class="text-base-content/60">{category.percentage}%</span>{/if}
 										{#if overBudget}
 											<span class="badge badge-error badge-sm">Over budget</span>
 										{/if}
@@ -387,6 +394,9 @@
 											style="width: {spentPct}%; background-color: {overBudget ? 'var(--color-error)' : category.color}; opacity: 0.7;"
 										></div>
 									</div>
+									{#if wallet.budget_type === 'fixed'}
+										<span class="text-xs text-base-content/40 shrink-0">of {formatCurrency(allocated, wallet.currency)}</span>
+									{/if}
 									<span class="text-xs text-base-content/60 shrink-0">
 										{formatCurrency(spent, wallet.currency)} spent
 									</span>
@@ -396,12 +406,16 @@
 					</div>
 
 					<!-- Visual bar -->
+					{@const totalFixed = wallet.categories.reduce((s, c) => s + (c.fixedAmount ?? 0), 0)}
 					<div class="flex h-2 rounded-full overflow-hidden bg-base-200 mt-5">
 						{#each wallet.categories as category (category.name)}
+							{@const barPct = wallet.budget_type === "fixed"
+								? (totalFixed > 0 ? ((category.fixedAmount ?? 0) / totalFixed) * 100 : 0)
+								: category.percentage}
 							<div
 								class="h-full"
-								style="width: {category.percentage}%; background-color: {category.color};"
-								title="{category.name}: {category.percentage}%"
+								style="width: {barPct}%; background-color: {category.color};"
+								title="{category.name}: {wallet.budget_type === 'fixed' ? (category.fixedAmount ?? 0) : category.percentage + '%'}"
 							></div>
 						{/each}
 					</div>
