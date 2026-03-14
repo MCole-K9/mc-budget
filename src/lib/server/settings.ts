@@ -16,7 +16,7 @@ async function upsertSetting(key: string, value: string): Promise<void> {
 	// duplicate-create (the previous single try/catch conflated the two).
 	let existing: { id: string } | null = null;
 	try {
-		existing = await pb.collection('app_settings').getFirstListItem(`key="${key}"`);
+		existing = await pb.collection('app_settings').getFirstListItem(`skey="${key}"`);
 	} catch {
 		// Record does not exist yet — will create below
 	}
@@ -24,7 +24,7 @@ async function upsertSetting(key: string, value: string): Promise<void> {
 	if (existing) {
 		await pb.collection('app_settings').update(existing.id, { value });
 	} else {
-		await pb.collection('app_settings').create({ key, value });
+		await pb.collection('app_settings').create({ skey: key, value });
 	}
 }
 
@@ -32,7 +32,7 @@ async function getSetting(key: string): Promise<string> {
 	assertSafeKey(key);
 	const pb = await getAdminPb();
 	try {
-		const record = await pb.collection('app_settings').getFirstListItem(`key="${key}"`);
+		const record = await pb.collection('app_settings').getFirstListItem(`skey="${key}"`);
 		return String(record['value'] || '');
 	} catch {
 		return '';
