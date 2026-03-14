@@ -61,7 +61,8 @@ export const getTransactionsPaged = query(GetTransactionsPagedSchema, async (inp
 
 	const result = await getPb().collection('transactions').getList(input.page, input.perPage, {
 		filter,
-		sort: '-date,-created'
+		sort: '-date,-created',
+		requestKey: null
 	});
 
 	return {
