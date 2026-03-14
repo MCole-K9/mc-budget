@@ -17,18 +17,28 @@
 	import TransactionList from '$lib/components/TransactionList.svelte';
 	import TransactionForm from '$lib/components/TransactionForm.svelte';
 
+	type Period = 'this-month' | 'last-month' | 'last-3-months' | 'this-year' | 'all-time' | 'custom';
+
+	const PERIODS: { value: Period; label: string }[] = [
+		{ value: 'this-month', label: 'This Month' },
+		{ value: 'last-month', label: 'Last Month' },
+		{ value: 'last-3-months', label: '3 Months' },
+		{ value: 'this-year', label: 'This Year' },
+		{ value: 'all-time', label: 'All Time' },
+		{ value: 'custom', label: 'Custom' }
+	];
+
 	let showAddTransaction = $state(false);
 	let showDeleteConfirm = $state(false);
 	let transactionToDelete = $state<Transaction | null>(null);
 	let reconciling = $state(false);
 	let error = $state('');
 
-	let filterMonth = $state(new Date().getMonth());
-	let filterYear = $state(new Date().getFullYear());
+	let selectedPeriod = $state<Period>('this-month');
+	let customStartDate = $state('');
+	let customEndDate = $state('');
 	let currentPage = $state(1);
 	const PER_PAGE = 15;
-
-	const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 	const walletId = page.params.id!;
 
@@ -37,36 +47,63 @@
 		await Promise.all([getWallet(walletId), getTransactions(walletId)])
 	);
 
+	function getDateRange(period: Period): { startDate?: string; endDate?: string } {
+		const now = new Date();
+		const pad = (n: number) => String(n).padStart(2, '0');
+		const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+		if (period === 'this-month') {
+			return { startDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`, endDate: today };
+		}
+		if (period === 'last-month') {
+			const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+			const m = now.getMonth() === 0 ? 12 : now.getMonth();
+			const lastDay = new Date(y, m, 0).getDate();
+			return { startDate: `${y}-${pad(m)}-01`, endDate: `${y}-${pad(m)}-${pad(lastDay)}` };
+		}
+		if (period === 'last-3-months') {
+			const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+			return { startDate: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-01`, endDate: today };
+		}
+		if (period === 'this-year') {
+			return { startDate: `${now.getFullYear()}-01-01`, endDate: today };
+		}
+		if (period === 'all-time') {
+			return {};
+		}
+		// custom
+		return {
+			startDate: customStartDate || undefined,
+			endDate: customEndDate || undefined
+		};
+	}
+
+	const dateRange = $derived(getDateRange(selectedPeriod));
+
 	// Server-filtered + paginated — used for the transaction list only
 	const pagedResult = $derived(
-		await getTransactionsPaged({ walletId, page: currentPage, perPage: PER_PAGE, month: filterMonth, year: filterYear })
+		await getTransactionsPaged({ walletId, page: currentPage, perPage: PER_PAGE, ...dateRange })
 	);
 
 	function refreshPagedQuery() {
-		getTransactionsPaged({ walletId, page: currentPage, perPage: PER_PAGE, month: filterMonth, year: filterYear }).refresh();
+		getTransactionsPaged({ walletId, page: currentPage, perPage: PER_PAGE, ...dateRange }).refresh();
 	}
 
-	function prevMonth() {
-		if (filterMonth === 0) { filterMonth = 11; filterYear--; }
-		else filterMonth--;
+	function setPeriod(p: Period) {
+		selectedPeriod = p;
 		currentPage = 1;
 	}
 
-	function nextMonth() {
-		if (filterMonth === 11) { filterMonth = 0; filterYear++; }
-		else filterMonth++;
-		currentPage = 1;
-	}
-
-	// CSV exports the current month's transactions (from all-transactions cache, filtered client-side)
+	// CSV exports all transactions in the current date range (from the full cache, filtered client-side)
 	function exportCsv() {
-		const monthTransactions = transactions.filter((t) => {
-			const d = new Date(t.date);
-			return d.getMonth() === filterMonth && d.getFullYear() === filterYear;
+		const filtered = transactions.filter((t) => {
+			if (dateRange.startDate && t.date < dateRange.startDate) return false;
+			if (dateRange.endDate && t.date > dateRange.endDate) return false;
+			return true;
 		});
 		const rows = [
 			['Date', 'Category', 'Description', 'Amount', 'Currency'],
-			...monthTransactions.map((t) => [
+			...filtered.map((t) => [
 				t.date,
 				t.category,
 				t.description || '',
@@ -79,7 +116,8 @@
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `${wallet.name}-${MONTHS[filterMonth]}-${filterYear}.csv`;
+		const suffix = dateRange.startDate ? dateRange.startDate : 'all';
+		a.download = `${wallet.name}-${suffix}.csv`;
 		a.click();
 		URL.revokeObjectURL(url);
 	}
@@ -238,12 +276,17 @@
 			<!-- Transactions -->
 			<Card title="Transactions">
 				{#snippet children()}
-					<!-- Month filter + export -->
-					<div class="flex items-center justify-between mb-4">
-						<div class="flex items-center gap-1">
-							<button class="btn btn-ghost btn-sm" onclick={prevMonth}>&larr;</button>
-							<span class="font-medium w-28 text-center">{MONTHS[filterMonth]} {filterYear}</span>
-							<button class="btn btn-ghost btn-sm" onclick={nextMonth}>&rarr;</button>
+					<!-- Period selector -->
+					<div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+						<div class="join">
+							{#each PERIODS as p (p.value)}
+								<button
+									class={['btn btn-sm join-item', selectedPeriod === p.value ? 'btn-primary' : 'btn-ghost']}
+									onclick={() => setPeriod(p.value)}
+								>
+									{p.label}
+								</button>
+							{/each}
 						</div>
 						{#if pagedResult.totalItems > 0}
 							<button class="btn btn-ghost btn-sm" onclick={exportCsv} title="Export as CSV">
@@ -251,6 +294,25 @@
 							</button>
 						{/if}
 					</div>
+
+					<!-- Custom date range inputs -->
+					{#if selectedPeriod === 'custom'}
+						<div class="flex items-center gap-2 mb-4">
+							<input
+								type="date"
+								class="input input-bordered input-sm flex-1"
+								value={customStartDate}
+								oninput={(e) => { customStartDate = e.currentTarget.value; currentPage = 1; }}
+							/>
+							<span class="text-base-content/60 text-sm shrink-0">to</span>
+							<input
+								type="date"
+								class="input input-bordered input-sm flex-1"
+								value={customEndDate}
+								oninput={(e) => { customEndDate = e.currentTarget.value; currentPage = 1; }}
+							/>
+						</div>
+					{/if}
 
 					<TransactionList
 						transactions={pagedResult.items}

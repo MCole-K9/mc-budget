@@ -17,18 +17,17 @@ const GetTransactionsPagedSchema = z.object({
 	walletId: z.string(),
 	page: z.number().default(1),
 	perPage: z.number().default(15),
-	month: z.number().min(0).max(11),
-	year: z.number()
+	startDate: z.string().optional(),
+	endDate: z.string().optional()
 });
 
 export const getTransactionsPaged = query(GetTransactionsPagedSchema, async (input) => {
-	const mm = String(input.month + 1).padStart(2, '0');
-	const startDate = `${input.year}-${mm}-01`;
-	const lastDay = new Date(input.year, input.month + 1, 0).getDate();
-	const endDate = `${input.year}-${mm}-${String(lastDay).padStart(2, '0')}`;
+	let filter = `wallet = "${input.walletId}"`;
+	if (input.startDate) filter += ` && date >= "${input.startDate}"`;
+	if (input.endDate) filter += ` && date <= "${input.endDate}"`;
 
 	const result = await getPb().collection('transactions').getList(input.page, input.perPage, {
-		filter: `wallet = "${input.walletId}" && date >= "${startDate}" && date <= "${endDate}"`,
+		filter,
 		sort: '-date,-created'
 	});
 
