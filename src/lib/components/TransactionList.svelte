@@ -18,78 +18,102 @@
 	}
 
 	function formatDate(dateStr: string): string {
-		return new Date(dateStr).toLocaleDateString('en-US', {
-			month: 'short',
+		const datePart = dateStr.split('T')[0].split(' ')[0];
+		const d = new Date(datePart + 'T00:00:00');
+		const now = new Date();
+		return d.toLocaleDateString('en-US', {
+			weekday: 'long',
+			month: 'long',
 			day: 'numeric',
-			year: 'numeric'
+			...(d.getFullYear() !== now.getFullYear() && { year: 'numeric' })
 		});
 	}
 
-	function getCategoryColor(categoryName: string): string {
-		const category = wallet.categories.find(
-			(c) => c.name.toLowerCase() === categoryName.toLowerCase()
+	function getCategoryColor(transaction: Transaction): string {
+		if (transaction.amount > 0) return '#22c55e';
+		const cat = wallet.categories.find(
+			(c) => c.name.toLowerCase() === transaction.category.toLowerCase()
 		);
-		return category?.color || '#6B7280';
+		return cat?.color ?? '#9ca3af';
 	}
 
 	function getReceiptUrl(transaction: Transaction): string | null {
 		if (!transaction.receipt) return null;
 		return `${PUBLIC_POCKETBASE_URL}/api/files/transactions/${transaction.id}/${transaction.receipt}`;
 	}
+
+	const grouped = $derived(
+		transactions.reduce<{ date: string; items: Transaction[] }[]>((acc, tx) => {
+			const datePart = tx.date.split('T')[0].split(' ')[0];
+			const last = acc[acc.length - 1];
+			if (last?.date === datePart) last.items.push(tx);
+			else acc.push({ date: datePart, items: [tx] });
+			return acc;
+		}, [])
+	);
 </script>
 
 {#if transactions.length === 0}
-	<div class="text-center py-8 text-base-content/60">
-		<p>No transactions yet</p>
-		<p class="text-sm mt-1">Add your first transaction to get started</p>
+	<div class="py-12 text-center">
+		<p class="text-base-content/40 text-sm">No transactions in this period</p>
 	</div>
 {:else}
-	<div class="divide-y divide-base-300">
-		{#each transactions as transaction (transaction.id)}
-			{@const receiptUrl = getReceiptUrl(transaction)}
-			<div class="flex items-center justify-between py-3">
-				<div class="flex items-center gap-3">
-					<span
-						class="w-3 h-3 rounded-full"
-						style="background-color: {getCategoryColor(transaction.category)};"
-					></span>
-					<div>
-						<p class="font-medium flex items-center gap-1">
-							{transaction.description || transaction.category}
-							{#if transaction.recurring}
-								<span class="text-base-content/40 text-xs" title="Repeats monthly on day {transaction.recur_day}">↻</span>
-							{/if}
-						</p>
-						<p class="text-sm text-base-content/60">
-							{transaction.category} &middot; {formatDate(transaction.date)}
-						</p>
-					</div>
-				</div>
-				<div class="flex items-center gap-2">
-					<span
-						class={['font-semibold', transaction.amount < 0 ? 'text-error' : 'text-success']}
-					>
-						{transaction.amount < 0 ? '-' : '+'}{formatCurrency(transaction.amount)}
+	<div class="space-y-4">
+		{#each grouped as { date, items } (date)}
+			<div>
+				<!-- Date header -->
+				<div class="flex items-center gap-3 px-1 mb-2">
+					<span class="text-xs font-semibold text-base-content/40 uppercase tracking-widest whitespace-nowrap">
+						{formatDate(date)}
 					</span>
-					{#if receiptUrl}
-						<a
-							href={receiptUrl}
-							target="_blank"
-							rel="noopener noreferrer"
-							class="btn btn-ghost btn-xs text-base-content/50"
-							title="View receipt"
-						>
-							🧾
-						</a>
-					{/if}
-					{#if ondelete}
-						<button
-							class="btn btn-ghost btn-xs text-error"
-							onclick={() => ondelete(transaction)}
-						>
-							✕
-						</button>
-					{/if}
+					<div class="flex-1 h-px bg-base-200"></div>
+				</div>
+
+				<!-- Transactions for this date -->
+				<div class="rounded-2xl overflow-hidden">
+					<div class="divide-y divide-base-200/60">
+						{#each items as transaction (transaction.id)}
+							{@const receiptUrl = getReceiptUrl(transaction)}
+							{@const color = getCategoryColor(transaction)}
+							<div class="flex items-center gap-3 px-4 py-3 hover:bg-base-200/50 transition-colors bg-base-100">
+								<span
+									class="w-2.5 h-2.5 rounded-full shrink-0"
+									style="background-color: {color};"
+								></span>
+
+								<div class="flex-1 min-w-0">
+									<p class="font-medium text-sm leading-snug truncate">
+										{transaction.description || transaction.category}
+										{#if transaction.recurring}
+											<span class="text-base-content/30 text-xs ml-1" title="Recurring">↻</span>
+										{/if}
+									</p>
+									<p class="text-xs text-base-content/40 truncate">{transaction.category}</p>
+								</div>
+
+								<div class="flex items-center gap-1 shrink-0">
+									<span class="font-semibold text-sm {transaction.amount < 0 ? 'text-error' : 'text-success'}">
+										{transaction.amount < 0 ? '−' : '+'}{formatCurrency(transaction.amount)}
+									</span>
+									{#if receiptUrl}
+										<a
+											href={receiptUrl}
+											target="_blank"
+											rel="noopener noreferrer"
+											class="btn btn-ghost btn-xs text-base-content/30 hover:text-base-content/70"
+											title="View receipt"
+										>🧾</a>
+									{/if}
+									{#if ondelete}
+										<button
+											class="btn btn-ghost btn-xs text-base-content/20 hover:text-error"
+											onclick={() => ondelete(transaction)}
+										>✕</button>
+									{/if}
+								</div>
+							</div>
+						{/each}
+					</div>
 				</div>
 			</div>
 		{/each}

@@ -14,23 +14,21 @@
 	let {
 		title,
 		compact = false,
-		bordered = true,
+		bordered = false,
 		class: className,
 		children,
 		actions
 	}: Props = $props();
 </script>
 
-<div
-	class={['card bg-base-100 shadow-sm', bordered && 'border border-base-300', className]}
->
-	<div class={['card-body', compact && 'p-4']}>
+<div class={['rounded-2xl bg-base-100 shadow-sm overflow-hidden', bordered && 'ring-1 ring-base-200', className]}>
+	<div class={compact ? 'p-4' : 'p-6'}>
 		{#if title}
-			<h2 class="card-title">{title}</h2>
+			<p class="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-4">{title}</p>
 		{/if}
 		{@render children()}
 		{#if actions}
-			<div class="card-actions justify-end mt-4">
+			<div class="flex justify-end gap-2 mt-4">
 				{@render actions()}
 			</div>
 		{/if}

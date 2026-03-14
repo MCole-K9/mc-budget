@@ -312,31 +312,33 @@
 			{/if}
 
 			<!-- Header -->
-			<div class="flex justify-between items-start">
-				<div>
-					<a href={resolve('/wallets')} class="btn btn-ghost btn-sm mb-2">&larr; Back to Wallets</a>
-					<h1 class="text-3xl font-bold">{wallet.name}</h1>
-					<div class="flex items-baseline gap-3 mt-2">
-						<p class="text-4xl font-bold text-primary">
-							{formatCurrency(wallet.balance, wallet.currency)}
-						</p>
-						<button
-							class="btn btn-ghost btn-sm text-lg text-base-content/40 hover:text-base-content/70"
-							onclick={handleRecalculate}
-							disabled={reconciling}
-							title="Recalculate balance from transaction history"
-						>
-							{reconciling ? '...' : '↺'}
-						</button>
+			<div>
+				<a href={resolve('/wallets')} class="btn btn-ghost btn-sm mb-3 -ml-3">&larr; Wallets</a>
+				<div class="flex justify-between items-end">
+					<div>
+						<h1 class="text-2xl font-bold">{wallet.name}</h1>
+						<div class="flex items-baseline gap-2 mt-1">
+							<p class="text-3xl font-bold text-primary tabular-nums">
+								{formatCurrency(wallet.balance, wallet.currency)}
+							</p>
+							<button
+								class="text-base text-base-content/30 hover:text-base-content/60 transition-colors"
+								onclick={handleRecalculate}
+								disabled={reconciling}
+								title="Recalculate balance from transaction history"
+							>
+								{reconciling ? '…' : '↺'}
+							</button>
+						</div>
 					</div>
-				</div>
-				<div class="flex gap-2">
-					<Button variant="primary" onclick={() => (showAddTransaction = true)}>
-						Add Transaction
-					</Button>
-					<Button variant="error" outline onclick={() => (showDeleteConfirm = true)}>
-						Delete
-					</Button>
+					<div class="flex gap-2">
+						<Button variant="primary" size="sm" onclick={() => (showAddTransaction = true)}>
+							+ Add
+						</Button>
+						<Button variant="ghost" size="sm" outline onclick={() => (showDeleteConfirm = true)}>
+							Delete
+						</Button>
+					</div>
 				</div>
 			</div>
 
@@ -344,13 +346,13 @@
 			<Card title="Budget Allocation">
 				{#snippet children()}
 					<!-- Period income summary -->
-					<div class="flex justify-between items-center mb-4 text-sm text-base-content/60">
-						<span>Based on {periodLabel} income</span>
-						<span class="font-medium text-base-content">{formatCurrency(periodIncome, wallet.currency)}</span>
+					<div class="flex justify-between items-center mb-5 pb-4 border-b border-base-200">
+						<span class="text-xs font-medium text-base-content/40 uppercase tracking-wider">Income · {periodLabel}</span>
+						<span class="text-sm font-semibold">{formatCurrency(periodIncome, wallet.currency)}</span>
 					</div>
 					{#if periodIncome === 0 && selectedPeriod !== 'all-time'}
-						<div class="text-sm text-base-content/60 text-center py-2">
-							No income in this period — switch to All Time to see total allocation.
+						<div class="text-xs text-base-content/40 text-center py-2">
+							No income this period. Switch to All Time to see full allocation.
 						</div>
 					{/if}
 					<div class="space-y-4">
@@ -379,7 +381,7 @@
 									</span>
 								</div>
 								<div class="flex items-center gap-2 pl-6">
-									<div class="flex-1 h-2 rounded-full bg-base-300 overflow-hidden">
+									<div class="flex-1 h-1.5 rounded-full bg-base-200 overflow-hidden">
 										<div
 											class="h-full rounded-full transition-all"
 											style="width: {spentPct}%; background-color: {overBudget ? 'var(--color-error)' : category.color}; opacity: 0.7;"
@@ -394,7 +396,7 @@
 					</div>
 
 					<!-- Visual bar -->
-					<div class="flex h-4 rounded-full overflow-hidden bg-base-300 mt-4">
+					<div class="flex h-2 rounded-full overflow-hidden bg-base-200 mt-5">
 						{#each wallet.categories as category (category.name)}
 							<div
 								class="h-full"
@@ -581,20 +583,13 @@
 
 					<!-- Pagination -->
 					{#if pagedResult.totalPages > 1}
-						<div class="flex items-center justify-center gap-3 mt-4 pt-4 border-t border-base-300">
-							<button
-								class="btn btn-ghost btn-sm"
-								disabled={currentPage === 1}
-								onclick={() => currentPage--}
-							>&larr;</button>
-							<span class="text-sm text-base-content/70">
-								{currentPage} / {pagedResult.totalPages}
-							</span>
-							<button
-								class="btn btn-ghost btn-sm"
-								disabled={currentPage === pagedResult.totalPages}
-								onclick={() => currentPage++}
-							>&rarr;</button>
+						<div class="flex items-center justify-between mt-4 pt-4">
+							<span class="text-sm text-base-content/40">{pagedResult.totalItems} transactions</span>
+							<div class="join">
+								<button class="join-item btn btn-sm" disabled={currentPage === 1} onclick={() => currentPage--}>&larr;</button>
+								<button class="join-item btn btn-sm btn-disabled">{currentPage} / {pagedResult.totalPages}</button>
+								<button class="join-item btn btn-sm" disabled={currentPage === pagedResult.totalPages} onclick={() => currentPage++}>&rarr;</button>
+							</div>
 						</div>
 					{/if}
 				{/snippet}

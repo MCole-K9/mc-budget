@@ -26,7 +26,7 @@
 </svelte:head>
 
 <div class="min-h-screen bg-base-200">
-	<nav class="navbar bg-base-100 shadow-sm">
+	<nav class="navbar bg-base-100 border-b border-base-200">
 		<div class="flex-1">
 			<a href={resolve('/')} class="btn btn-ghost text-xl">MC Budget</a>
 		</div>

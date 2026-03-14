@@ -17,7 +17,7 @@
 	{#snippet children()}
 		<div class="max-w-4xl mx-auto">
 			<div class="flex justify-between items-center mb-6">
-				<h1 class="text-3xl font-bold">My Wallets</h1>
+				<h1 class="text-2xl font-bold">My Wallets</h1>
 				<a href={resolve('/wallets/new')}>
 					<Button variant="primary">Create Wallet</Button>
 				</a>

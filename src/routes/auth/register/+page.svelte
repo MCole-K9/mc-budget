@@ -2,8 +2,6 @@
 	import { register } from '$lib/auth.remote';
 	import { resolve } from '$app/paths';
 	import Button from '$lib/components/Button.svelte';
-	import Card from '$lib/components/Card.svelte';
-	import Alert from '$lib/components/Alert.svelte';
 
 	const registerForm = register;
 </script>
@@ -12,85 +10,78 @@
 	<title>Sign Up - MC Budget</title>
 </svelte:head>
 
-<div class="max-w-md mx-auto">
-	<Card title="Create Account">
+<div class="max-w-sm mx-auto mt-8">
+	<div class="text-center mb-8">
+		<h1 class="text-2xl font-bold">Create account</h1>
+		<p class="text-base-content/50 text-sm mt-1">Start managing your budget</p>
+	</div>
+
+	<div class="rounded-2xl bg-base-100 shadow-sm p-6 space-y-4">
 		{#each registerForm.fields.allIssues() as issue (issue.message)}
-			<Alert type="error">{issue.message}</Alert>
+			<div class="text-sm text-error bg-error/10 rounded-xl px-4 py-3">{issue.message}</div>
 		{/each}
 
-		<form {...registerForm} class="space-y-4 mt-4">
-			<div class="form-control w-full">
-				<div class="label">
-					<span class="label-text">Name</span>
-				</div>
+		<form {...registerForm} class="space-y-4">
+			<div class="space-y-1.5">
+				<label class="text-sm font-medium text-base-content/70" for="name">Name</label>
 				<input
 					{...registerForm.fields.name.as('text')}
+					id="name"
 					class="input input-bordered w-full"
 					placeholder="Your name"
 				/>
 				{#each registerForm.fields.name.issues() as issue (issue.message)}
-					<div class="label">
-						<span class="label-text-alt text-error">{issue.message}</span>
-					</div>
+					<p class="text-xs text-error">{issue.message}</p>
 				{/each}
 			</div>
 
-			<div class="form-control w-full">
-				<div class="label">
-					<span class="label-text">Email</span>
-				</div>
+			<div class="space-y-1.5">
+				<label class="text-sm font-medium text-base-content/70" for="email">Email</label>
 				<input
 					{...registerForm.fields.email.as('email')}
+					id="email"
 					class="input input-bordered w-full"
 					placeholder="you@example.com"
 				/>
 				{#each registerForm.fields.email.issues() as issue (issue.message)}
-					<div class="label">
-						<span class="label-text-alt text-error">{issue.message}</span>
-					</div>
+					<p class="text-xs text-error">{issue.message}</p>
 				{/each}
 			</div>
 
-			<div class="form-control w-full">
-				<div class="label">
-					<span class="label-text">Password</span>
-				</div>
+			<div class="space-y-1.5">
+				<label class="text-sm font-medium text-base-content/70" for="password">Password</label>
 				<input
 					{...registerForm.fields.password.as('password')}
+					id="password"
 					class="input input-bordered w-full"
 					placeholder="Create a password"
 				/>
 				{#each registerForm.fields.password.issues() as issue (issue.message)}
-					<div class="label">
-						<span class="label-text-alt text-error">{issue.message}</span>
-					</div>
+					<p class="text-xs text-error">{issue.message}</p>
 				{/each}
 			</div>
 
-			<div class="form-control w-full">
-				<div class="label">
-					<span class="label-text">Confirm Password</span>
-				</div>
+			<div class="space-y-1.5">
+				<label class="text-sm font-medium text-base-content/70" for="passwordConfirm">Confirm Password</label>
 				<input
 					{...registerForm.fields.passwordConfirm.as('password')}
+					id="passwordConfirm"
 					class="input input-bordered w-full"
 					placeholder="Confirm your password"
 				/>
 				{#each registerForm.fields.passwordConfirm.issues() as issue (issue.message)}
-					<div class="label">
-						<span class="label-text-alt text-error">{issue.message}</span>
-					</div>
+					<p class="text-xs text-error">{issue.message}</p>
 				{/each}
 			</div>
 
-			<Button type="submit" variant="primary" class="w-full" loading={!!registerForm.pending}>
+			<Button type="submit" variant="primary" class="w-full mt-2" loading={!!registerForm.pending}>
 				Create Account
 			</Button>
 		</form>
+	</div>
 
-		<p class="text-center mt-4 text-sm text-base-content/70">
-			Already have an account?
-			<a href={resolve('/auth/login')} class="link link-primary">Sign in</a>
-		</p>
-	</Card>
+	<p class="text-center mt-5 text-sm text-base-content/50">
+		Already have an account?
+		<a href={resolve('/auth/login')} class="link link-primary font-medium">Sign in</a>
+	</p>
 </div>

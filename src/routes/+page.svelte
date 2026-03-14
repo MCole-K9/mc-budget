@@ -14,7 +14,7 @@
 	{#if auth.isAuthenticated}
 		<div class="flex justify-between items-center mb-6">
 			<div>
-				<h1 class="text-3xl font-bold">Welcome back, {auth.user?.name}!</h1>
+				<h1 class="text-2xl font-bold">Welcome back, {auth.user?.name}!</h1>
 				<p class="text-base-content/70 mt-1">Here's your financial overview</p>
 			</div>
 			<div class="flex gap-2">

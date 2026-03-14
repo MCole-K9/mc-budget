@@ -83,7 +83,7 @@
 <AuthGuard>
 	{#snippet children()}
 		<div class="max-w-4xl mx-auto">
-			<h1 class="text-3xl font-bold mb-6">Create New Wallet</h1>
+			<h1 class="text-2xl font-bold mb-6">Create New Wallet</h1>
 
 			{#if error}
 				<Alert type="error" dismissible ondismiss={() => (error = '')} class="mb-6">

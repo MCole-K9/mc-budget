@@ -83,7 +83,7 @@
 
 <AuthGuard>
 	{#snippet children()}
-		<div class="max-w-2xl mx-auto space-y-4">
+		<div class="max-w-4xl mx-auto space-y-4">
 
 			<!-- Header -->
 			<div>
@@ -120,16 +120,16 @@
 					{@const net = income - expense}
 					<div class="grid grid-cols-3 gap-3">
 						<div class="bg-base-100 rounded-2xl p-4 shadow-sm">
-							<p class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-1">Income</p>
-							<p class="text-xl font-bold text-success">{formatCurrency(income, currency)}</p>
+							<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-1">Income</p>
+							<p class="text-xl font-bold text-success tabular-nums">{formatCurrency(income, currency)}</p>
 						</div>
 						<div class="bg-base-100 rounded-2xl p-4 shadow-sm">
-							<p class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-1">Expenses</p>
-							<p class="text-xl font-bold text-error">{formatCurrency(expense, currency)}</p>
+							<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-1">Expenses</p>
+							<p class="text-xl font-bold text-error tabular-nums">{formatCurrency(expense, currency)}</p>
 						</div>
 						<div class="bg-base-100 rounded-2xl p-4 shadow-sm">
-							<p class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-1">Net</p>
-							<p class="text-xl font-bold {net >= 0 ? 'text-success' : 'text-error'}">
+							<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-1">Net</p>
+							<p class="text-xl font-bold tabular-nums {net >= 0 ? 'text-success' : 'text-error'}">
 								{net >= 0 ? '+' : ''}{formatCurrency(Math.abs(net), currency)}
 							</p>
 						</div>
@@ -139,8 +139,8 @@
 
 			<!-- Transaction list -->
 			{#if pagedResult.totalItems === 0}
-				<div class="bg-base-100 rounded-2xl p-12 text-center shadow-sm">
-					<p class="text-base-content/50">No transactions in this period.</p>
+				<div class="rounded-2xl bg-base-100 shadow-sm p-12 text-center">
+					<p class="text-base-content/40 text-sm">No transactions in this period.</p>
 				</div>
 			{:else}
 				<div class="space-y-4">
@@ -151,7 +151,7 @@
 								<span class="text-xs font-semibold text-base-content/40 uppercase tracking-widest whitespace-nowrap">
 									{formatDate(date)}
 								</span>
-								<div class="flex-1 h-px bg-base-300"></div>
+								<div class="flex-1 h-px bg-base-200"></div>
 							</div>
 
 							<!-- Transactions for this date -->
