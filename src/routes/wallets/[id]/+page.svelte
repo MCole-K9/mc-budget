@@ -56,6 +56,7 @@
 	let customEndDate = $state(initial.endDate);
 	let cycleStartDay = $state(walletForPrefs.cycle_start_day || 1);
 	let cycleStartDayInput = $state(walletForPrefs.cycle_start_day || 1);
+	let cycleOffset = $state(0);
 	let currentPage = $state(1);
 	const PER_PAGE = 15;
 
@@ -95,11 +96,11 @@
 		}
 		if (period === 'pay-cycle') {
 			const day = Math.min(cycleStartDay, 28);
-			const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, day);
-			const currMonthDate = new Date(now.getFullYear(), now.getMonth(), day);
+			const startDate = new Date(now.getFullYear(), now.getMonth() - 1 + cycleOffset, day);
+			const endDate = new Date(now.getFullYear(), now.getMonth() + cycleOffset, day);
 			return {
-				startDate: `${prevMonthDate.getFullYear()}-${pad(prevMonthDate.getMonth() + 1)}-${pad(prevMonthDate.getDate())}`,
-				endDate: `${currMonthDate.getFullYear()}-${pad(currMonthDate.getMonth() + 1)}-${pad(currMonthDate.getDate())}`
+				startDate: `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`,
+				endDate: `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}`
 			};
 		}
 		// 'custom' or any saved period name — dates are in customStartDate/customEndDate
@@ -128,6 +129,7 @@
 	function setPeriod(p: string) {
 		selectedPeriod = p;
 		currentPage = 1;
+		cycleOffset = 0;
 		showSaveRangeInput = false;
 		saveRangeName = '';
 		// If selecting a named saved period, copy its dates so getDateRange can read them
@@ -455,6 +457,25 @@
 
 						<!-- Pay cycle day config -->
 						{#if selectedPeriod === 'pay-cycle'}
+							<div class="flex items-center gap-2">
+								<button
+									class="btn btn-ghost btn-sm"
+									onclick={() => { cycleOffset--; currentPage = 1; }}
+								>&larr;</button>
+								<span class="text-sm text-base-content/70 min-w-40 text-center">
+									{dateRange.startDate} – {dateRange.endDate}
+								</span>
+								<button
+									class="btn btn-ghost btn-sm"
+									onclick={() => { cycleOffset++; currentPage = 1; }}
+								>&rarr;</button>
+								{#if cycleOffset !== 0}
+									<button
+										class="btn btn-ghost btn-xs text-base-content/50"
+										onclick={() => { cycleOffset = 0; currentPage = 1; }}
+									>today</button>
+								{/if}
+							</div>
 							<div class="flex items-center gap-2 text-sm">
 								<span class="text-base-content/60 shrink-0">Cycle starts on day</span>
 								<input
