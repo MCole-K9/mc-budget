@@ -119,7 +119,7 @@ export const TransactionSchema = z.object({
 	category: z.string(),
 	amount: z.number(),
 	description: z.string(),
-	date: z.string(),
+	date: z.string().transform((d) => d.split('T')[0].split(' ')[0]),
 	receipt: z.string().catch(''),
 	recurring: z.boolean().catch(false),
 	recur_day: z.number().catch(0),

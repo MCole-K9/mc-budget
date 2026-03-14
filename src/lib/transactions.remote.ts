@@ -22,7 +22,7 @@ const GetTransactionSummarySchema = z.object({
 export const getTransactionSummary = query(GetTransactionSummarySchema, async (input) => {
 	let filter = `wallet = "${input.walletId}"`;
 	if (input.startDate) filter += ` && date >= "${input.startDate}"`;
-	if (input.endDate) filter += ` && date <= "${input.endDate}"`;
+	if (input.endDate) filter += ` && date <= "${input.endDate} 23:59:59.999Z"`;
 
 	const records = await getPb().collection('transactions').getFullList({
 		filter,
@@ -57,7 +57,7 @@ const GetTransactionsPagedSchema = z.object({
 export const getTransactionsPaged = query(GetTransactionsPagedSchema, async (input) => {
 	let filter = `wallet = "${input.walletId}"`;
 	if (input.startDate) filter += ` && date >= "${input.startDate}"`;
-	if (input.endDate) filter += ` && date <= "${input.endDate}"`;
+	if (input.endDate) filter += ` && date <= "${input.endDate} 23:59:59.999Z"`;
 
 	const result = await getPb().collection('transactions').getList(input.page, input.perPage, {
 		filter,
@@ -83,7 +83,7 @@ const GetAllTransactionsPagedSchema = z.object({
 export const getAllTransactionsPaged = query(GetAllTransactionsPagedSchema, async (input) => {
 	let filter = '';
 	if (input.startDate) filter += `date >= "${input.startDate}"`;
-	if (input.endDate) filter += (filter ? ' && ' : '') + `date <= "${input.endDate}"`;
+	if (input.endDate) filter += (filter ? ' && ' : '') + `date <= "${input.endDate} 23:59:59.999Z"`;
 
 	const result = await getPb().collection('transactions').getList(input.page, input.perPage, {
 		filter: filter || undefined,
@@ -122,7 +122,7 @@ const GetAllTransactionsSummarySchema = z.object({
 export const getAllTransactionsSummary = query(GetAllTransactionsSummarySchema, async (input) => {
 	let filter = '';
 	if (input.startDate) filter += `date >= "${input.startDate}"`;
-	if (input.endDate) filter += (filter ? ' && ' : '') + `date <= "${input.endDate}"`;
+	if (input.endDate) filter += (filter ? ' && ' : '') + `date <= "${input.endDate} 23:59:59.999Z"`;
 
 	const records = await getPb().collection('transactions').getFullList({
 		filter: filter || undefined,
