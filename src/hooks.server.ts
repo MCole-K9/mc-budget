@@ -11,6 +11,7 @@ function isProtectedRoute(pathname: string) {
 	const presetsPath = resolve('/presets');
 	const transactionsPath = resolve('/transactions');
 	const reportsPath = resolve('/reports');
+	const settingsPath = resolve('/settings');
 
 	return (
 		pathname === walletsPath ||
@@ -20,7 +21,9 @@ function isProtectedRoute(pathname: string) {
 		pathname === transactionsPath ||
 		pathname.startsWith(`${transactionsPath}/`) ||
 		pathname === reportsPath ||
-		pathname.startsWith(`${reportsPath}/`)
+		pathname.startsWith(`${reportsPath}/`) ||
+		pathname === settingsPath ||
+		pathname.startsWith(`${settingsPath}/`)
 	);
 }
 

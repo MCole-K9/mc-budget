@@ -1,0 +1,11 @@
+import type { PageServerLoad } from './$types';
+import { redirect } from '@sveltejs/kit';
+import { resolve } from '$app/paths';
+
+export const load: PageServerLoad = async ({ locals }) => {
+	if (!locals.user) {
+		redirect(303, resolve('/auth/login'));
+	}
+
+	return {};
+};
