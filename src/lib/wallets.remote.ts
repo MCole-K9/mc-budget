@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { query, command } from '$app/server';
 import { getPb } from '$lib/server/db';
-import { CreateWalletInputSchema, WalletSchema, TransactionSchema } from '$lib/schemas/budget';
+import { CreateWalletInputSchema, WalletSchema, TransactionSchema, UpdatePeriodPrefsInputSchema } from '$lib/schemas/budget';
 
 export const getWallets = query(async () => {
 	const records = await getPb().collection('wallets').getFullList({ sort: '-created' });
@@ -45,6 +45,16 @@ export const updateWalletBalance = command(
 		return WalletSchema.parse(record);
 	}
 );
+
+export const updatePeriodPrefs = command(UpdatePeriodPrefsInputSchema, async ({ id, default_period, saved_periods, cycle_start_day }) => {
+	const record = await getPb().collection('wallets').update(id, {
+		...(default_period !== undefined && { default_period }),
+		...(saved_periods !== undefined && { saved_periods }),
+		...(cycle_start_day !== undefined && { cycle_start_day })
+	});
+	getWallet(id).refresh();
+	return WalletSchema.parse(record);
+});
 
 export const recalculateBalance = command(z.string(), async (walletId) => {
 	const pb = getPb();

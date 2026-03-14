@@ -1,16 +1,17 @@
 /// <reference path="../pb_data/types.d.ts" />
 
 migrate((app) => {
-  // Always create the demo account (skip if already seeded)
+  // Always create the demo account (idempotent — skip if email already exists)
   let user;
-  try {
-    user = app.findAuthRecordByEmail("users", "demo@mcbudget.com");
-  } catch (_) {
-    // Doesn't exist yet — create it
+  const existingUsers = app.findRecordsByFilter("users", `email = "demo@mcbudget.com"`, "", 1);
+  if (existingUsers.length > 0) {
+    user = existingUsers[0];
+  } else {
     const usersCol = app.findCollectionByNameOrId("users");
     user = new Record(usersCol);
     user.set("email", "demo@mcbudget.com");
-    user.setPassword("demo1234demo");
+    user.set("password", "demo1234demo");
+    user.set("passwordConfirm", "demo1234demo");
     user.set("verified", true);
     app.save(user);
   }

@@ -76,6 +76,23 @@ export const RegisterInputSchema = z
 
 export type RegisterInput = z.infer<typeof RegisterInputSchema>;
 
+// Saved custom date range
+export const SavedPeriodSchema = z.object({
+	name: z.string().min(1).max(100),
+	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+	endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+});
+
+export type SavedPeriod = z.infer<typeof SavedPeriodSchema>;
+
+// Update period preferences input
+export const UpdatePeriodPrefsInputSchema = z.object({
+	id: z.string().min(1),
+	default_period: z.string().optional(),
+	saved_periods: z.array(SavedPeriodSchema).optional(),
+	cycle_start_day: z.number().int().min(1).max(28).optional()
+});
+
 // Wallet Schema (from database)
 export const WalletSchema = z.object({
 	id: z.string(),
@@ -86,6 +103,9 @@ export const WalletSchema = z.object({
 	total_funded: z.number().catch(0),
 	currency: z.string(),
 	categories: z.array(BudgetCategorySchema),
+	default_period: z.string().catch(''),
+	saved_periods: z.array(SavedPeriodSchema).catch([]),
+	cycle_start_day: z.number().catch(1),
 	created: z.string(),
 	updated: z.string()
 });

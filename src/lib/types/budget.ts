@@ -8,7 +8,8 @@ export type {
 	CreateTransactionInput,
 	User,
 	LoginInput,
-	RegisterInput
+	RegisterInput,
+	SavedPeriod
 } from '$lib/schemas/budget';
 
 // Re-export schemas for validation

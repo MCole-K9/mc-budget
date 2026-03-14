@@ -2,14 +2,14 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { getWallet, deleteWallet, recalculateBalance } from '$lib/wallets.remote';
+	import { getWallet, deleteWallet, recalculateBalance, updatePeriodPrefs } from '$lib/wallets.remote';
 	import {
 		getTransactions,
 		getTransactionsPaged,
 		getTransactionSummary,
 		deleteTransaction as removeTransaction
 	} from '$lib/transactions.remote';
-	import type { Transaction } from '$lib/types/budget';
+	import type { Transaction, SavedPeriod } from '$lib/types/budget';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import Card from '$lib/components/Card.svelte';
 	import Button from '$lib/components/Button.svelte';
@@ -18,16 +18,17 @@
 	import TransactionList from '$lib/components/TransactionList.svelte';
 	import TransactionForm from '$lib/components/TransactionForm.svelte';
 
-	type Period = 'this-month' | 'last-month' | 'last-3-months' | 'this-year' | 'all-time' | 'custom';
-
-	const PERIODS: { value: Period; label: string }[] = [
+	const BUILTIN_PERIODS: { value: string; label: string }[] = [
 		{ value: 'this-month', label: 'This Month' },
 		{ value: 'last-month', label: 'Last Month' },
 		{ value: 'last-3-months', label: '3 Months' },
 		{ value: 'this-year', label: 'This Year' },
 		{ value: 'all-time', label: 'All Time' },
+		{ value: 'pay-cycle', label: 'Pay Cycle' },
 		{ value: 'custom', label: 'Custom' }
 	];
+
+	const RESERVED_PERIOD_VALUES = new Set(BUILTIN_PERIODS.map((p) => p.value));
 
 	let showAddTransaction = $state(false);
 	let showDeleteConfirm = $state(false);
@@ -35,15 +36,40 @@
 	let reconciling = $state(false);
 	let error = $state('');
 
-	let selectedPeriod = $state<Period>('this-month');
-	let customStartDate = $state('');
-	let customEndDate = $state('');
+	const walletId = page.params.id!;
+
+	// Eagerly fetch wallet to bootstrap period prefs before any state is declared
+	const walletForPrefs = await getWallet(walletId);
+
+	function resolveInitialPeriod(w: typeof walletForPrefs) {
+		const stored = w.default_period;
+		if (!stored) return { period: 'this-month', startDate: '', endDate: '' };
+		if (RESERVED_PERIOD_VALUES.has(stored)) return { period: stored, startDate: '', endDate: '' };
+		const savedMatch = w.saved_periods.find((s) => s.name === stored);
+		if (savedMatch) return { period: stored, startDate: savedMatch.startDate, endDate: savedMatch.endDate };
+		return { period: 'this-month', startDate: '', endDate: '' };
+	}
+
+	const initial = resolveInitialPeriod(walletForPrefs);
+	let selectedPeriod = $state(initial.period);
+	let customStartDate = $state(initial.startDate);
+	let customEndDate = $state(initial.endDate);
+	let cycleStartDay = $state(walletForPrefs.cycle_start_day || 1);
+	let cycleStartDayInput = $state(walletForPrefs.cycle_start_day || 1);
 	let currentPage = $state(1);
 	const PER_PAGE = 15;
 
-	const walletId = page.params.id!;
+	// Save range UI
+	let saveRangeName = $state('');
+	let showSaveRangeInput = $state(false);
+	let savingPrefs = $state(false);
 
-	function getDateRange(period: Period): { startDate?: string; endDate?: string } {
+	// Whether to show date picker inputs (custom period or named saved period)
+	const showDateInputs = $derived(!['this-month', 'last-month', 'last-3-months', 'this-year', 'all-time', 'pay-cycle'].includes(selectedPeriod));
+
+	// getDateRange must NOT reference `wallet` to avoid a circular $derived dependency.
+	// When selecting a saved period, setPeriod() copies its dates into customStartDate/customEndDate.
+	function getDateRange(period: string): { startDate?: string; endDate?: string } {
 		const now = new Date();
 		const pad = (n: number) => String(n).padStart(2, '0');
 		const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
@@ -67,7 +93,16 @@
 		if (period === 'all-time') {
 			return {};
 		}
-		// custom
+		if (period === 'pay-cycle') {
+			const day = Math.min(cycleStartDay, 28);
+			const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, day);
+			const currMonthDate = new Date(now.getFullYear(), now.getMonth(), day);
+			return {
+				startDate: `${prevMonthDate.getFullYear()}-${pad(prevMonthDate.getMonth() + 1)}-${pad(prevMonthDate.getDate())}`,
+				endDate: `${currMonthDate.getFullYear()}-${pad(currMonthDate.getMonth() + 1)}-${pad(currMonthDate.getDate())}`
+			};
+		}
+		// 'custom' or any saved period name — dates are in customStartDate/customEndDate
 		return {
 			startDate: customStartDate || undefined,
 			endDate: customEndDate || undefined
@@ -90,9 +125,19 @@
 		getTransactionSummary({ walletId, ...dateRange }).refresh();
 	}
 
-	function setPeriod(p: Period) {
+	function setPeriod(p: string) {
 		selectedPeriod = p;
 		currentPage = 1;
+		showSaveRangeInput = false;
+		saveRangeName = '';
+		// If selecting a named saved period, copy its dates so getDateRange can read them
+		const saved =
+			wallet?.saved_periods.find((s) => s.name === p) ??
+			walletForPrefs.saved_periods.find((s) => s.name === p);
+		if (saved) {
+			customStartDate = saved.startDate;
+			customEndDate = saved.endDate;
+		}
 	}
 
 	// CSV fetches transactions on demand (lazy) and exports the current date range
@@ -122,6 +167,47 @@
 		a.download = `${wallet.name}-${suffix}.csv`;
 		a.click();
 		URL.revokeObjectURL(url);
+	}
+
+	async function persistPeriodPrefs(patch: { default_period?: string; saved_periods?: SavedPeriod[]; cycle_start_day?: number }) {
+		savingPrefs = true;
+		try {
+			await updatePeriodPrefs({ id: walletId, ...patch });
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to save period preference';
+		} finally {
+			savingPrefs = false;
+		}
+	}
+
+	async function handleSaveRange() {
+		const name = saveRangeName.trim();
+		if (!name || !customStartDate || !customEndDate) return;
+		if (RESERVED_PERIOD_VALUES.has(name)) {
+			error = `"${name}" is reserved. Choose a different name.`;
+			return;
+		}
+		const existing = wallet.saved_periods.filter((s) => s.name !== name);
+		const updated: SavedPeriod[] = [...existing, { name, startDate: customStartDate, endDate: customEndDate }];
+		await persistPeriodPrefs({ saved_periods: updated });
+		saveRangeName = '';
+		showSaveRangeInput = false;
+		selectedPeriod = name; // highlight the newly saved period
+	}
+
+	async function handleDeleteSavedPeriod(sp: SavedPeriod) {
+		const updated = wallet.saved_periods.filter((s) => s.name !== sp.name);
+		const patch: { saved_periods: SavedPeriod[]; default_period?: string } = { saved_periods: updated };
+		if (wallet.default_period === sp.name) patch.default_period = '';
+		await persistPeriodPrefs(patch);
+		if (selectedPeriod === sp.name) setPeriod('this-month');
+	}
+
+	async function handleSaveCycleDay() {
+		const day = Math.max(1, Math.min(28, Math.round(cycleStartDayInput)));
+		cycleStartDay = day;
+		cycleStartDayInput = day;
+		await persistPeriodPrefs({ cycle_start_day: day });
 	}
 
 	function handleDeleteTransaction(transaction: Transaction) {
@@ -174,6 +260,10 @@
 		if (dateRange.endDate && date > dateRange.endDate) return false;
 		return true;
 	}
+
+	const periodLabel = $derived(
+		BUILTIN_PERIODS.find((p) => p.value === selectedPeriod)?.label ?? selectedPeriod
+	);
 
 	// Income received in the selected period.
 	// For 'all-time' use total_funded (which includes initial_balance + all income).
@@ -237,7 +327,7 @@
 				{#snippet children()}
 					<!-- Period income summary -->
 					<div class="flex justify-between items-center mb-4 text-sm text-base-content/60">
-						<span>Based on {PERIODS.find(p => p.value === selectedPeriod)?.label} income</span>
+						<span>Based on {periodLabel} income</span>
 						<span class="font-medium text-base-content">{formatCurrency(periodIncome, wallet.currency)}</span>
 					</div>
 					{#if periodIncome === 0 && selectedPeriod !== 'all-time'}
@@ -302,42 +392,143 @@
 			<Card title="Transactions">
 				{#snippet children()}
 					<!-- Period selector -->
-					<div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-						<div class="join">
-							{#each PERIODS as p (p.value)}
-								<button
-									class={['btn btn-sm join-item', selectedPeriod === p.value ? 'btn-primary' : 'btn-ghost']}
-									onclick={() => setPeriod(p.value)}
-								>
-									{p.label}
-								</button>
+					<div class="space-y-2 mb-4">
+						<!-- Built-in periods -->
+						<div class="flex flex-wrap items-center gap-1">
+							{#each BUILTIN_PERIODS as p (p.value)}
+								<div class="flex items-center">
+									<button
+										class={['btn btn-sm', selectedPeriod === p.value ? 'btn-primary' : 'btn-ghost']}
+										onclick={() => setPeriod(p.value)}
+									>
+										{p.label}
+									</button>
+									<button
+										class="btn btn-ghost btn-xs px-1 opacity-50 hover:opacity-100"
+										onclick={() => persistPeriodPrefs({ default_period: p.value })}
+										disabled={savingPrefs}
+										title="{wallet.default_period === p.value ? 'Default period' : 'Set as default'}"
+									>
+										{wallet.default_period === p.value ? '★' : '☆'}
+									</button>
+								</div>
 							{/each}
+							{#if pagedResult.totalItems > 0}
+								<button class="btn btn-ghost btn-sm ml-auto" onclick={exportCsv} title="Export as CSV">
+									↓ CSV
+								</button>
+							{/if}
 						</div>
-						{#if pagedResult.totalItems > 0}
-							<button class="btn btn-ghost btn-sm" onclick={exportCsv} title="Export as CSV">
-								↓ CSV
-							</button>
+
+						<!-- Saved periods -->
+						{#if wallet.saved_periods.length > 0}
+							<div class="flex flex-wrap gap-1">
+								{#each wallet.saved_periods as sp (sp.name)}
+									<div class="flex items-center border border-base-300 rounded-lg overflow-hidden">
+										<button
+											class={['btn btn-sm btn-ghost rounded-none border-0', selectedPeriod === sp.name && 'btn-active']}
+											onclick={() => setPeriod(sp.name)}
+										>
+											{sp.name}
+											<span class="text-xs text-base-content/40 ml-1">{sp.startDate}–{sp.endDate}</span>
+										</button>
+										<button
+											class="btn btn-ghost btn-xs px-1 opacity-50 hover:opacity-100 rounded-none border-0"
+											onclick={() => persistPeriodPrefs({ default_period: sp.name })}
+											disabled={savingPrefs}
+											title="{wallet.default_period === sp.name ? 'Default period' : 'Set as default'}"
+										>
+											{wallet.default_period === sp.name ? '★' : '☆'}
+										</button>
+										<button
+											class="btn btn-ghost btn-xs px-1 text-error opacity-50 hover:opacity-100 rounded-none border-0"
+											onclick={() => handleDeleteSavedPeriod(sp)}
+											disabled={savingPrefs}
+											title="Remove saved range"
+										>
+											×
+										</button>
+									</div>
+								{/each}
+							</div>
+						{/if}
+
+						<!-- Pay cycle day config -->
+						{#if selectedPeriod === 'pay-cycle'}
+							<div class="flex items-center gap-2 text-sm">
+								<span class="text-base-content/60 shrink-0">Cycle starts on day</span>
+								<input
+									type="number"
+									class="input input-bordered input-sm w-20"
+									min="1"
+									max="28"
+									value={cycleStartDayInput}
+									oninput={(e) => (cycleStartDayInput = Number(e.currentTarget.value))}
+									onkeydown={(e) => e.key === 'Enter' && handleSaveCycleDay()}
+								/>
+								<span class="text-base-content/60 shrink-0">of the month</span>
+								{#if cycleStartDayInput !== cycleStartDay}
+									<Button variant="primary" onclick={handleSaveCycleDay} disabled={savingPrefs}>
+										{savingPrefs ? '…' : 'Save'}
+									</Button>
+								{/if}
+							</div>
+						{/if}
+
+						<!-- Date inputs (custom period or named saved period) -->
+						{#if showDateInputs}
+							<div class="flex items-center gap-2">
+								<input
+									type="date"
+									class="input input-bordered input-sm flex-1"
+									value={customStartDate}
+									oninput={(e) => { customStartDate = e.currentTarget.value; currentPage = 1; }}
+								/>
+								<span class="text-base-content/60 text-sm shrink-0">to</span>
+								<input
+									type="date"
+									class="input input-bordered input-sm flex-1"
+									value={customEndDate}
+									oninput={(e) => { customEndDate = e.currentTarget.value; currentPage = 1; }}
+								/>
+							</div>
+
+							<!-- Save this range -->
+							{#if customStartDate && customEndDate}
+								{#if !showSaveRangeInput}
+									<button
+										class="btn btn-ghost btn-xs"
+										onclick={() => (showSaveRangeInput = true)}
+									>
+										+ Save this range…
+									</button>
+								{:else}
+									<div class="flex items-center gap-2">
+										<input
+											type="text"
+											class="input input-bordered input-sm flex-1"
+											placeholder="Range name (e.g. Q1 2026)"
+											bind:value={saveRangeName}
+											maxlength="100"
+										/>
+										<Button
+											variant="primary"
+											onclick={handleSaveRange}
+											disabled={!saveRangeName.trim() || savingPrefs}
+										>
+											{savingPrefs ? '…' : 'Save'}
+										</Button>
+										<Button
+											variant="ghost"
+											onclick={() => { showSaveRangeInput = false; saveRangeName = ''; }}
+										>
+											Cancel
+										</Button>
+									</div>
+								{/if}
+							{/if}
 						{/if}
 					</div>
-
-					<!-- Custom date range inputs -->
-					{#if selectedPeriod === 'custom'}
-						<div class="flex items-center gap-2 mb-4">
-							<input
-								type="date"
-								class="input input-bordered input-sm flex-1"
-								value={customStartDate}
-								oninput={(e) => { customStartDate = e.currentTarget.value; currentPage = 1; }}
-							/>
-							<span class="text-base-content/60 text-sm shrink-0">to</span>
-							<input
-								type="date"
-								class="input input-bordered input-sm flex-1"
-								value={customEndDate}
-								oninput={(e) => { customEndDate = e.currentTarget.value; currentPage = 1; }}
-							/>
-						</div>
-					{/if}
 
 					<TransactionList
 						transactions={pagedResult.items}
