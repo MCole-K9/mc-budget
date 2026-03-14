@@ -50,8 +50,11 @@
 
 	function handleCustomBudget() {
 		selectedPresetId = undefined;
-		categories = [{ name: 'Category 1', percentage: 100, color: '#3B82F6' }];
-		budgetType = 'percentage';
+		if (budgetType === 'fixed') {
+			categories = [{ name: 'Category 1', percentage: 0, fixedAmount: 0, color: '#3B82F6' }];
+		} else {
+			categories = [{ name: 'Category 1', percentage: 100, color: '#3B82F6' }];
+		}
 		step = 'customize';
 	}
 
@@ -128,7 +131,11 @@
 			{#if step === 'preset'}
 				<div class="space-y-6">
 					<p class="text-base-content/70">
-						Choose a budget template to get started, or create a custom budget.
+						{#if budgetType === 'fixed'}
+							Choose a category template to get started, or build from scratch.
+						{:else}
+							Choose a budget template to get started, or create a custom budget.
+						{/if}
 					</p>
 
 					<!-- Budget type selection -->
@@ -152,6 +159,7 @@
 					<BudgetPresetSelector
 						{presets}
 						selected={selectedPresetId}
+						{budgetType}
 						onselect={handlePresetSelect}
 					/>
 
