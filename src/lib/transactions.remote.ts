@@ -47,7 +47,9 @@ const CreateTransactionFormSchema = z.object({
 	amount: z.number().gt(0, 'Amount must be greater than 0'),
 	description: z.string().optional(),
 	date: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid date format'),
-	receipt: z.instanceof(File).optional()
+	receipt: z.instanceof(File).optional(),
+	recurring: z.string().optional(),
+	recur_day: z.number().optional()
 });
 
 export const createTransaction = form(CreateTransactionFormSchema, async (input) => {
@@ -70,12 +72,17 @@ export const createTransaction = form(CreateTransactionFormSchema, async (input)
 		}
 	}
 
+	const isRecurring = input.recurring === 'true';
+	const recurDay = isRecurring ? Math.min(28, Math.max(1, input.recur_day ?? 1)) : 0;
+
 	const formData = new FormData();
 	formData.append('wallet', input.walletId);
 	formData.append('category', finalCategory);
 	formData.append('amount', String(finalAmount));
 	formData.append('description', input.description?.trim() || '');
 	formData.append('date', input.date);
+	formData.append('recurring', String(isRecurring));
+	formData.append('recur_day', String(recurDay));
 
 	if (input.receipt instanceof File && input.receipt.size > 0) {
 		formData.append('receipt', input.receipt);

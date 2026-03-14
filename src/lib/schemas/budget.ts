@@ -101,6 +101,9 @@ export const TransactionSchema = z.object({
 	description: z.string(),
 	date: z.string(),
 	receipt: z.string().catch(''),
+	recurring: z.boolean().catch(false),
+	recur_day: z.number().catch(0),
+	recurring_source_id: z.string().catch(''),
 	created: z.string()
 });
 

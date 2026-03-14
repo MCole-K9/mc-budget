@@ -167,10 +167,26 @@
 		return (balance * percentage) / 100;
 	}
 
-	// All-time spending per category (uses full transaction list)
+	function inDateRange(date: string): boolean {
+		if (dateRange.startDate && date < dateRange.startDate) return false;
+		if (dateRange.endDate && date > dateRange.endDate) return false;
+		return true;
+	}
+
+	// Income received in the selected period.
+	// For 'all-time' use total_funded (which includes initial_balance + all income).
+	// For other periods: income transactions in range + initial_balance if wallet was created in range.
+	const periodIncome = $derived(
+		selectedPeriod === 'all-time'
+			? wallet.total_funded
+			: transactions.filter((t) => t.amount > 0 && inDateRange(t.date)).reduce((sum, t) => sum + t.amount, 0) +
+				(inDateRange(wallet.created.split('T')[0]) ? wallet.initial_balance : 0)
+	);
+
+	// Spending per category, filtered to the selected period
 	function getCategorySpent(categoryName: string): number {
 		return transactions
-			.filter((t) => t.category.toLowerCase() === categoryName.toLowerCase() && t.amount < 0)
+			.filter((t) => t.category.toLowerCase() === categoryName.toLowerCase() && t.amount < 0 && inDateRange(t.date))
 			.reduce((sum, t) => sum + Math.abs(t.amount), 0);
 	}
 </script>
@@ -220,9 +236,19 @@
 			<!-- Budget Allocation -->
 			<Card title="Budget Allocation">
 				{#snippet children()}
+					<!-- Period income summary -->
+					<div class="flex justify-between items-center mb-4 text-sm text-base-content/60">
+						<span>Based on {PERIODS.find(p => p.value === selectedPeriod)?.label} income</span>
+						<span class="font-medium text-base-content">{formatCurrency(periodIncome, wallet.currency)}</span>
+					</div>
+					{#if periodIncome === 0 && selectedPeriod !== 'all-time'}
+						<div class="text-sm text-base-content/60 text-center py-2">
+							No income in this period — switch to All Time to see total allocation.
+						</div>
+					{/if}
 					<div class="space-y-4">
 						{#each wallet.categories as category (category.name)}
-							{@const allocated = getCategoryAmount(wallet.total_funded, category.percentage)}
+							{@const allocated = getCategoryAmount(periodIncome, category.percentage)}
 							{@const spent = getCategorySpent(category.name)}
 							{@const remaining = allocated - spent}
 							{@const spentPct = allocated > 0 ? Math.min(100, (spent / allocated) * 100) : 0}

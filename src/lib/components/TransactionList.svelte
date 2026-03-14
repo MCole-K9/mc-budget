@@ -54,8 +54,11 @@
 						style="background-color: {getCategoryColor(transaction.category)};"
 					></span>
 					<div>
-						<p class="font-medium">
+						<p class="font-medium flex items-center gap-1">
 							{transaction.description || transaction.category}
+							{#if transaction.recurring}
+								<span class="text-base-content/40 text-xs" title="Repeats monthly on day {transaction.recur_day}">↻</span>
+							{/if}
 						</p>
 						<p class="text-sm text-base-content/60">
 							{transaction.category} &middot; {formatDate(transaction.date)}
