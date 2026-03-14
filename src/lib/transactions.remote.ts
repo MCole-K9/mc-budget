@@ -144,6 +144,86 @@ export const getAllTransactionsSummary = query(GetAllTransactionsSummarySchema, 
 	return { byCurrency };
 });
 
+const GetReportInputSchema = z.object({
+	walletId: z.string().optional(),
+	startDate: z.string().optional(),
+	endDate: z.string().optional()
+});
+
+type TopExpense = {
+	id: string;
+	description: string;
+	category: string;
+	amount: number;
+	currency: string;
+	walletName: string;
+	date: string;
+	color: string;
+};
+
+export const getReport = query(GetReportInputSchema, async (input) => {
+	let filter = '';
+	if (input.walletId) filter += `wallet = "${input.walletId}"`;
+	if (input.startDate) filter += (filter ? ' && ' : '') + `date >= "${input.startDate}"`;
+	if (input.endDate) filter += (filter ? ' && ' : '') + `date <= "${input.endDate} 23:59:59.999Z"`;
+
+	const records = await getPb().collection('transactions').getFullList({
+		filter: filter || undefined,
+		expand: 'wallet',
+		sort: 'date',
+		requestKey: null
+	});
+
+	const byCurrency: Record<string, { income: number; expense: number }> = {};
+	const byCategory: Record<string, Record<string, { spent: number; color: string }>> = {};
+	const byMonth: Record<string, Record<string, { income: number; expense: number }>> = {};
+	const topExpenses: TopExpense[] = [];
+
+	for (const r of records) {
+		const amount = Number(r.amount) || 0;
+		const date = String(r.date).split('T')[0].split(' ')[0];
+		const month = date.slice(0, 7);
+		const w = r.expand?.['wallet'] as Record<string, unknown> | undefined;
+		const currency = String(w?.currency ?? 'USD');
+		const cats = Array.isArray(w?.categories) ? (w.categories as { name: string; color: string }[]) : [];
+		const category = String(r.category);
+		const color = cats.find((c) => c.name.toLowerCase() === category.toLowerCase())?.color ?? '#9ca3af';
+
+		if (!byCurrency[currency]) byCurrency[currency] = { income: 0, expense: 0 };
+		if (amount > 0) byCurrency[currency].income += amount;
+		else byCurrency[currency].expense += Math.abs(amount);
+
+		if (amount < 0) {
+			if (!byCategory[currency]) byCategory[currency] = {};
+			if (!byCategory[currency][category]) byCategory[currency][category] = { spent: 0, color };
+			byCategory[currency][category].spent += Math.abs(amount);
+		}
+
+		if (!byMonth[month]) byMonth[month] = {};
+		if (!byMonth[month][currency]) byMonth[month][currency] = { income: 0, expense: 0 };
+		if (amount > 0) byMonth[month][currency].income += amount;
+		else byMonth[month][currency].expense += Math.abs(amount);
+
+		if (amount < 0) {
+			topExpenses.push({
+				id: String(r.id),
+				description: String(r.description || ''),
+				category,
+				amount: Math.abs(amount),
+				currency,
+				walletName: String(w?.name ?? ''),
+				date,
+				color
+			});
+		}
+	}
+
+	topExpenses.sort((a, b) => b.amount - a.amount);
+	topExpenses.splice(10);
+
+	return { byCurrency, byCategory, byMonth, topExpenses };
+});
+
 const CreateTransactionFormSchema = z.object({
 	walletId: z.string().min(1, 'Wallet ID required'),
 	isExpense: z.string(),
