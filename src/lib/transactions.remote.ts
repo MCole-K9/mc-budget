@@ -13,6 +13,38 @@ export const getTransactions = query(z.string(), async (walletId) => {
 	return records.map((r) => TransactionSchema.parse(r));
 });
 
+const GetTransactionSummarySchema = z.object({
+	walletId: z.string(),
+	startDate: z.string().optional(),
+	endDate: z.string().optional()
+});
+
+export const getTransactionSummary = query(GetTransactionSummarySchema, async (input) => {
+	let filter = `wallet = "${input.walletId}"`;
+	if (input.startDate) filter += ` && date >= "${input.startDate}"`;
+	if (input.endDate) filter += ` && date <= "${input.endDate}"`;
+
+	const records = await getPb().collection('transactions').getFullList({
+		filter,
+		fields: 'amount,category'
+	});
+
+	let income = 0;
+	const spendingByCategory: Record<string, number> = {};
+
+	for (const r of records) {
+		const amount = Number(r.amount) || 0;
+		if (amount > 0) {
+			income += amount;
+		} else {
+			const cat = String(r.category).toLowerCase();
+			spendingByCategory[cat] = (spendingByCategory[cat] ?? 0) + Math.abs(amount);
+		}
+	}
+
+	return { income, spendingByCategory };
+});
+
 const GetTransactionsPagedSchema = z.object({
 	walletId: z.string(),
 	page: z.number().default(1),

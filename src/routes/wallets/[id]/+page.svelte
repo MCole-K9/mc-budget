@@ -6,6 +6,7 @@
 	import {
 		getTransactions,
 		getTransactionsPaged,
+		getTransactionSummary,
 		deleteTransaction as removeTransaction
 	} from '$lib/transactions.remote';
 	import type { Transaction } from '$lib/types/budget';
@@ -42,11 +43,6 @@
 
 	const walletId = page.params.id!;
 
-	// All transactions — used for budget allocation card and CSV export
-	const [wallet, transactions] = $derived(
-		await Promise.all([getWallet(walletId), getTransactions(walletId)])
-	);
-
 	function getDateRange(period: Period): { startDate?: string; endDate?: string } {
 		const now = new Date();
 		const pad = (n: number) => String(n).padStart(2, '0');
@@ -80,13 +76,18 @@
 
 	const dateRange = $derived(getDateRange(selectedPeriod));
 
-	// Server-filtered + paginated — used for the transaction list only
-	const pagedResult = $derived(
-		await getTransactionsPaged({ walletId, page: currentPage, perPage: PER_PAGE, ...dateRange })
+	// All three fetched in parallel to avoid waterfalls
+	const [wallet, summary, pagedResult] = $derived(
+		await Promise.all([
+			getWallet(walletId),
+			getTransactionSummary({ walletId, ...dateRange }),
+			getTransactionsPaged({ walletId, page: currentPage, perPage: PER_PAGE, ...dateRange })
+		])
 	);
 
 	function refreshPagedQuery() {
 		getTransactionsPaged({ walletId, page: currentPage, perPage: PER_PAGE, ...dateRange }).refresh();
+		getTransactionSummary({ walletId, ...dateRange }).refresh();
 	}
 
 	function setPeriod(p: Period) {
@@ -94,9 +95,10 @@
 		currentPage = 1;
 	}
 
-	// CSV exports all transactions in the current date range (from the full cache, filtered client-side)
-	function exportCsv() {
-		const filtered = transactions.filter((t) => {
+	// CSV fetches transactions on demand (lazy) and exports the current date range
+	async function exportCsv() {
+		const allTx = await getTransactions(walletId);
+		const filtered = allTx.filter((t) => {
 			if (dateRange.startDate && t.date < dateRange.startDate) return false;
 			if (dateRange.endDate && t.date > dateRange.endDate) return false;
 			return true;
@@ -175,19 +177,16 @@
 
 	// Income received in the selected period.
 	// For 'all-time' use total_funded (which includes initial_balance + all income).
-	// For other periods: income transactions in range + initial_balance if wallet was created in range.
+	// For other periods: server-aggregated income + initial_balance if wallet was created in range.
 	const periodIncome = $derived(
 		selectedPeriod === 'all-time'
 			? wallet.total_funded
-			: transactions.filter((t) => t.amount > 0 && inDateRange(t.date)).reduce((sum, t) => sum + t.amount, 0) +
-				(inDateRange(wallet.created.split('T')[0]) ? wallet.initial_balance : 0)
+			: summary.income + (inDateRange(wallet.created.split('T')[0]) ? wallet.initial_balance : 0)
 	);
 
-	// Spending per category, filtered to the selected period
+	// Spending per category for the selected period — from server-aggregated summary
 	function getCategorySpent(categoryName: string): number {
-		return transactions
-			.filter((t) => t.category.toLowerCase() === categoryName.toLowerCase() && t.amount < 0 && inDateRange(t.date))
-			.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+		return summary.spendingByCategory[categoryName.toLowerCase()] ?? 0;
 	}
 </script>
 
