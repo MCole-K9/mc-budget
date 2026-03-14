@@ -291,16 +291,20 @@ export const deleteTransaction = command(
 	async ({ id, walletId }) => {
 		const pb = getPb();
 		const transaction = TransactionSchema.parse(await pb.collection('transactions').getOne(id));
-		const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(walletId));
+		if (transaction.wallet !== walletId) {
+			throw new Error('Transaction does not belong to the specified wallet');
+		}
+
+		const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(transaction.wallet));
 
 		await pb.collection('transactions').delete(id);
-		await pb.collection('wallets').update(walletId, {
+		await pb.collection('wallets').update(transaction.wallet, {
 			balance: wallet.balance - transaction.amount,
 			...(transaction.amount > 0 && { total_funded: wallet.total_funded - transaction.amount })
 		});
 
-		getTransactions(walletId).refresh();
-		getWallet(walletId).refresh();
+		getTransactions(transaction.wallet).refresh();
+		getWallet(transaction.wallet).refresh();
 		return { success: true };
 	}
 );

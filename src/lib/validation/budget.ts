@@ -15,6 +15,10 @@ export function validateCategories(
 	}
 
 	if (budgetType === 'fixed') {
+		if (categories.length === 0) {
+			return { valid: false, errors: ['At least one category is required'] };
+		}
+
 		const invalid = categories.filter((c) => !c.fixedAmount || c.fixedAmount <= 0);
 		if (invalid.length > 0) {
 			return { valid: false, errors: ['Each category must have a fixed amount greater than 0'] };
