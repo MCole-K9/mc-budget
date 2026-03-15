@@ -12,7 +12,10 @@ COPY pb_migrations /pb/pb_migrations
 COPY pb_entrypoint.sh /pb/entrypoint.sh
 RUN chmod +x /pb/entrypoint.sh
 
-VOLUME ["/pb/pb_data"]
+# VOLUME ["/pb/pb_data"]
+# Railway bans the VOLUME keyword — volumes are configured via the Railway dashboard instead.
+# Uncomment when deploying outside Railway (VPS, plain Docker, etc.).
+
 EXPOSE 8090
 
 ENTRYPOINT ["/pb/entrypoint.sh"]
