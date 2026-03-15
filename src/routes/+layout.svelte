@@ -30,17 +30,22 @@
 		<div class="flex-1">
 			<a href={resolve('/')} class="btn btn-ghost text-xl">MC Budget</a>
 		</div>
-		<div class="flex-none gap-2">
+		<div class="flex flex-none items-center gap-2">
 			{#if auth.isAuthenticated}
-				<a href={resolve('/wallets')} class="btn btn-ghost btn-sm">Wallets</a>
-				<a href={resolve('/transactions')} class="btn btn-ghost btn-sm">Transactions</a>
-				<a href={resolve('/reports')} class="btn btn-ghost btn-sm">Reports</a>
-				<a href={resolve('/presets')} class="btn btn-ghost btn-sm">Presets</a>
+				<!-- Desktop nav links -->
+				<div class="hidden sm:flex gap-1">
+					<a href={resolve('/wallets')} class="btn btn-ghost btn-sm">Wallets</a>
+					<a href={resolve('/transactions')} class="btn btn-ghost btn-sm">Transactions</a>
+					<a href={resolve('/reports')} class="btn btn-ghost btn-sm">Reports</a>
+					<a href={resolve('/presets')} class="btn btn-ghost btn-sm">Presets</a>
+				</div>
+
+				<!-- Avatar dropdown (desktop: name + links hidden; mobile: includes nav links) -->
 				<div class="dropdown dropdown-end">
-					<div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar placeholder">
-						<div class="bg-neutral text-neutral-content w-10 rounded-full">
-							<span class="text-sm">{auth.user?.name?.charAt(0) || '?'}</span>
-						</div>
+					<div tabindex="0" role="button" class="btn btn-ghost btn-circle">
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+							<path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+						</svg>
 					</div>
 					<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 					<ul
@@ -48,6 +53,12 @@
 						class="menu menu-sm dropdown-content bg-base-100 rounded-box z-10 mt-3 w-52 p-2 shadow"
 					>
 						<li><span class="font-medium">{auth.user?.name}</span></li>
+						<!-- Mobile-only nav links -->
+						<li class="sm:hidden"><a href={resolve('/wallets')}>Wallets</a></li>
+						<li class="sm:hidden"><a href={resolve('/transactions')}>Transactions</a></li>
+						<li class="sm:hidden"><a href={resolve('/reports')}>Reports</a></li>
+						<li class="sm:hidden"><a href={resolve('/presets')}>Presets</a></li>
+						<li class="sm:hidden divider my-0"></li>
 						<li><a href={resolve('/settings')}>Settings</a></li>
 						<li><button onclick={handleLogout}>Logout</button></li>
 					</ul>
