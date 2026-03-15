@@ -13,6 +13,7 @@
 	import BudgetPresetSelector from '$lib/components/BudgetPresetSelector.svelte';
 	import BudgetCategoryList from '$lib/components/BudgetCategoryList.svelte';
 	import { validateCategories } from '$lib/validation/budget';
+	import { CURRENCIES } from '$lib/settings';
 
 	let step = $state<'preset' | 'customize' | 'details'>('preset');
 	let name = $state('');
@@ -26,15 +27,6 @@
 
 	// Load presets using experimental async
 	const presets = await getPresets();
-
-	const currencyOptions = [
-		{ value: 'USD', label: 'USD - US Dollar' },
-		{ value: 'EUR', label: 'EUR - Euro' },
-		{ value: 'GBP', label: 'GBP - British Pound' },
-		{ value: 'JPY', label: 'JPY - Japanese Yen' },
-		{ value: 'CAD', label: 'CAD - Canadian Dollar' },
-		{ value: 'AUD', label: 'AUD - Australian Dollar' }
-	];
 
 	const categoriesValid = $derived(validateCategories(categories, budgetType).valid);
 
@@ -220,7 +212,7 @@
 							<Select
 								label="Currency"
 								bind:value={currency}
-								options={currencyOptions}
+								options={CURRENCIES}
 								required
 							/>
 
