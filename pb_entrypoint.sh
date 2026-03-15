@@ -6,6 +6,6 @@ set -e
 /pb/pocketbase superuser upsert "$PB_ADMIN_EMAIL" "$PB_ADMIN_PASSWORD"
 
 exec /pb/pocketbase serve \
-  --http=0.0.0.0:8090 \
+  --http=0.0.0.0:${PORT:-8090} \
   --dir=/pb/pb_data \
   --migrationsDir=/pb/pb_migrations

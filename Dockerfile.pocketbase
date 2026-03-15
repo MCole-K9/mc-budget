@@ -16,6 +16,6 @@ RUN chmod +x /pb/entrypoint.sh
 # Railway bans the VOLUME keyword — volumes are configured via the Railway dashboard instead.
 # Uncomment when deploying outside Railway (VPS, plain Docker, etc.).
 
-EXPOSE 8090
+EXPOSE ${PORT:-8090}
 
 ENTRYPOINT ["/pb/entrypoint.sh"]
