@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { getAiSettings, saveProviderKey, setActiveProvider, getFinancialSettings, setBaseCurrency } from '$lib/settings.remote';
+	import { getAiSettings, saveProviderKey, setActiveProvider, getFinancialSettings, setBaseCurrency, getUserAiSettings, saveUserProviderKey, clearUserProviderKey } from '$lib/settings.remote';
 	import { AI_PROVIDERS, PROVIDER_LABELS, PROVIDER_MODELS } from '$lib/settings';
 	import type { AiProvider } from '$lib/settings';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 
-	const [initial, { baseCurrency: initBase }] = await Promise.all([getAiSettings(), getFinancialSettings()]);
+	const [initial, { baseCurrency: initBase }, userAi] = await Promise.all([getAiSettings(), getFinancialSettings(), getUserAiSettings()]);
+	const isAdmin = initial.isAdmin;
 	let baseCurrencyInput = $state(initBase);
 	let savingBase = $state(false);
 	let baseSaved = $state(false);
@@ -61,6 +62,45 @@
 			activating = null;
 		}
 	}
+
+	// Personal API key state
+	let userConfigured = $state({ ...userAi.keys });
+	let userKeys = $state<Record<AiProvider, string>>({ anthropic: '', openai: '', google: '' });
+	let userSaving = $state<AiProvider | null>(null);
+	let userClearing = $state<AiProvider | null>(null);
+	let userErrors = $state<Record<AiProvider, string>>({ anthropic: '', openai: '', google: '' });
+	let userSaved = $state<AiProvider | null>(null);
+
+	async function handleSaveUserKey(provider: AiProvider) {
+		if (!userKeys[provider].trim()) return;
+		userSaving = provider;
+		userErrors[provider] = '';
+		userSaved = null;
+		try {
+			await saveUserProviderKey({ provider, apiKey: userKeys[provider].trim() });
+			userConfigured[provider] = true;
+			userSaved = provider;
+			userKeys[provider] = '';
+			setTimeout(() => { if (userSaved === provider) userSaved = null; }, 3000);
+		} catch (err) {
+			userErrors[provider] = err instanceof Error ? err.message : 'Failed to save key';
+		} finally {
+			userSaving = null;
+		}
+	}
+
+	async function handleClearUserKey(provider: AiProvider) {
+		userClearing = provider;
+		userErrors[provider] = '';
+		try {
+			await clearUserProviderKey({ provider });
+			userConfigured[provider] = false;
+		} catch (err) {
+			userErrors[provider] = err instanceof Error ? err.message : 'Failed to clear key';
+		} finally {
+			userClearing = null;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -105,6 +145,82 @@
 				</div>
 			</div>
 
+
+		<div>
+			<h2 class="text-xs font-semibold text-base-content/40 uppercase tracking-widest mb-3">
+				Personal API Keys
+			</h2>
+			<p class="text-sm text-base-content/50 mb-4">
+				Your own keys override the shared system keys. Values are stored per-user, server-side, and never sent to the browser.
+			</p>
+
+			<div class="grid gap-4 md:grid-cols-3">
+				{#each AI_PROVIDERS as provider (provider)}
+					{@const isSet = userConfigured[provider]}
+					{@const isSaving = userSaving === provider}
+					{@const isClearing = userClearing === provider}
+
+					<div class="bg-base-100 rounded-2xl shadow-sm p-4 flex flex-col gap-3">
+						<div class="flex items-start justify-between">
+							<div>
+								<p class="font-semibold">{PROVIDER_LABELS[provider]}</p>
+								<p class="text-xs text-base-content/40 mt-0.5">Personal key</p>
+							</div>
+							{#if isSet}
+								<span class="badge badge-success badge-sm">Key set</span>
+							{:else}
+								<span class="badge badge-ghost badge-sm">Using system</span>
+							{/if}
+						</div>
+
+						{#if userSaved === provider}
+							<p class="text-xs text-success">✓ Key saved</p>
+						{/if}
+						{#if userErrors[provider]}
+							<p class="text-xs text-error">{userErrors[provider]}</p>
+						{/if}
+
+						<div class="flex gap-2">
+							<input
+								type="password"
+								class="input input-bordered input-sm flex-1 min-w-0"
+								placeholder={isSet ? 'Replace key…' : 'Paste key…'}
+								autocomplete="off"
+								bind:value={userKeys[provider]}
+								onkeydown={(e) => e.key === 'Enter' && handleSaveUserKey(provider)}
+							/>
+							<button
+								class="btn btn-sm btn-primary"
+								disabled={!userKeys[provider].trim() || isSaving}
+								onclick={() => handleSaveUserKey(provider)}
+							>
+								{#if isSaving}
+									<span class="loading loading-spinner loading-xs"></span>
+								{:else}
+									Save
+								{/if}
+							</button>
+						</div>
+
+						{#if isSet}
+							<button
+								class="btn btn-sm btn-ghost w-full text-error/70 hover:text-error"
+								disabled={isClearing}
+								onclick={() => handleClearUserKey(provider)}
+							>
+								{#if isClearing}
+									<span class="loading loading-spinner loading-xs"></span>
+								{:else}
+									Remove (use system key)
+								{/if}
+							</button>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		</div>
+
+			{#if isAdmin}
 			<div>
 				<h2 class="text-xs font-semibold text-base-content/40 uppercase tracking-widest mb-3">
 					AI Provider
@@ -191,6 +307,7 @@
 					{/each}
 				</div>
 			</div>
+			{/if}
 		</div>
 	{/snippet}
 </AuthGuard>

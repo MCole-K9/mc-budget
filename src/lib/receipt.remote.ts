@@ -6,6 +6,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { PROVIDER_MODELS } from '$lib/settings';
 import { getAiKey, getAiProvider } from '$lib/server/settings';
+import { getUserSetting } from '$lib/server/userSettings';
 
 const ScanReceiptInputSchema = z.object({
 	imageBase64: z.string(),
@@ -30,7 +31,8 @@ export type ExtractedReceipt = z.infer<typeof ExtractedReceiptSchema>;
 
 export const scanReceipt = command(ScanReceiptInputSchema, async (input) => {
 	const provider = await getAiProvider();
-	const apiKey = await getAiKey(provider);
+	// User's own key takes priority; fall back to system key
+	const apiKey = (await getUserSetting(`${provider}_api_key`)) || (await getAiKey(provider));
 
 	if (!apiKey) {
 		throw new Error(`No API key configured for ${provider}. Add it in Settings.`);

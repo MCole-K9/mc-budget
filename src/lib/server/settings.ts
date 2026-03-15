@@ -60,11 +60,3 @@ export async function getAiKey(provider: AiProvider): Promise<string> {
 export async function setAiKey(provider: AiProvider, value: string): Promise<void> {
 	await upsertSetting(`${provider}_api_key`, value);
 }
-
-export async function getBaseCurrency(): Promise<string> {
-	return (await getSetting('base_currency')) || 'USD';
-}
-
-export async function setBaseCurrency(currency: string): Promise<void> {
-	await upsertSetting('base_currency', currency.toUpperCase());
-}
