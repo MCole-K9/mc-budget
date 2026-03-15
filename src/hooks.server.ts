@@ -58,10 +58,12 @@ export const handle: Handle = async ({ event, resolve: resolveRequest }) => {
 
 	const response = await resolveRequest(event);
 
-	// httpOnly: false is required for PocketBase realtime websocket connections
+	// httpOnly: true keeps the auth token out of client-side JS, reducing XSS token theft risk.
+	// Note: PocketBase realtime/SSE subscriptions require httpOnly: false (JS must read the cookie
+	// to authenticate the WebSocket). This app does not use realtime, so true is safe here.
 	response.headers.set(
 		'set-cookie',
-		event.locals.pb.authStore.exportToCookie({ httpOnly: false, sameSite: 'Lax', secure: !dev })
+		event.locals.pb.authStore.exportToCookie({ httpOnly: true, sameSite: 'Lax', secure: !dev })
 	);
 
 	return response;

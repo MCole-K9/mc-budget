@@ -1,17 +1,48 @@
 import { command } from '$app/server';
 import { z } from 'zod';
 import { generateText, Output, type LanguageModel } from 'ai';
+import { error } from '@sveltejs/kit';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { PROVIDER_MODELS } from '$lib/settings';
 import { getAiKey, getAiProvider } from '$lib/server/settings';
 import { getUserSetting } from '$lib/server/userSettings';
+import { getPb } from '$lib/server/db';
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_BASE64_LENGTH = Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 4;
+const MAX_CATEGORIES = 50;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_REQUESTS = 10;
+
+const scanRateState = new Map<string, number[]>();
+
+function requireAuthUserId(): string {
+	const userId = getPb().authStore.record?.id;
+	if (!userId) {
+		error(401, 'Not authenticated');
+	}
+	return userId;
+}
+
+function enforceScanRateLimit(userId: string): void {
+	const now = Date.now();
+	const windowStart = now - RATE_LIMIT_WINDOW_MS;
+	const recent = (scanRateState.get(userId) ?? []).filter((ts) => ts > windowStart);
+
+	if (recent.length >= RATE_LIMIT_REQUESTS) {
+		error(429, 'Too many receipt scans. Please wait a minute and try again.');
+	}
+
+	recent.push(now);
+	scanRateState.set(userId, recent);
+}
 
 const ScanReceiptInputSchema = z.object({
-	imageBase64: z.string(),
+	imageBase64: z.string().min(1).max(MAX_IMAGE_BASE64_LENGTH),
 	mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/gif']),
-	categories: z.array(z.string())
+	categories: z.array(z.string().min(1).max(100)).min(1).max(MAX_CATEGORIES)
 });
 
 const ExtractedReceiptSchema = z.object({
@@ -27,6 +58,14 @@ const ExtractedReceiptSchema = z.object({
 export type ExtractedReceipt = z.infer<typeof ExtractedReceiptSchema>;
 
 export const scanReceipt = command(ScanReceiptInputSchema, async (input) => {
+	const userId = requireAuthUserId();
+	enforceScanRateLimit(userId);
+
+	const imageBytes = Buffer.from(input.imageBase64, 'base64');
+	if (imageBytes.length === 0 || imageBytes.length > MAX_IMAGE_BYTES) {
+		error(413, 'Receipt image is too large. Max size is 5MB.');
+	}
+
 	const provider = await getAiProvider();
 	// User's own key takes priority; fall back to system key
 	const apiKey = (await getUserSetting(`${provider}_api_key`)) || (await getAiKey(provider));
@@ -67,7 +106,7 @@ export const scanReceipt = command(ScanReceiptInputSchema, async (input) => {
 				content: [
 					{
 						type: 'image',
-						image: Buffer.from(input.imageBase64, 'base64')
+						image: imageBytes
 					},
 					{
 						type: 'text',
