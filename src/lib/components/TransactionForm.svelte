@@ -57,11 +57,19 @@
 		});
 	}
 
+	const MAX_RECEIPT_SIZE = 5 * 1024 * 1024; // 5MB
+
 	function handleReceiptFile(e: Event) {
 		const file = (e.currentTarget as HTMLInputElement).files?.[0];
-		selectedFile = file?.type.startsWith('image/') ? file : null;
 		scanned = false;
 		scanError = '';
+		if (file && file.size > MAX_RECEIPT_SIZE) {
+			selectedFile = null;
+			scanError = `Receipt is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum size is 5 MB.`;
+			(e.currentTarget as HTMLInputElement).value = '';
+			return;
+		}
+		selectedFile = file?.type.startsWith('image/') ? file : null;
 	}
 
 	async function handleScan() {
