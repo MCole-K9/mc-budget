@@ -5,15 +5,31 @@ export interface ValidationResult {
 	errors: string[];
 }
 
-export function validateCategories(categories: BudgetCategory[]): ValidationResult {
-	const result = BudgetCategoriesSchema.safeParse(categories);
+export function validateCategories(
+	categories: BudgetCategory[],
+	budgetType: 'percentage' | 'fixed' = 'percentage'
+): ValidationResult {
+	const names = categories.map((c) => c.name.toLowerCase().trim());
+	if (new Set(names).size !== names.length) {
+		return { valid: false, errors: ['Duplicate category names are not allowed'] };
+	}
 
-	if (result.success) {
+	if (budgetType === 'fixed') {
+		if (categories.length === 0) {
+			return { valid: false, errors: ['At least one category is required'] };
+		}
+
+		const invalid = categories.filter((c) => !c.fixedAmount || c.fixedAmount <= 0);
+		if (invalid.length > 0) {
+			return { valid: false, errors: ['Each category must have a fixed amount greater than 0'] };
+		}
 		return { valid: true, errors: [] };
 	}
 
-	const errors = result.error.issues.map((e) => e.message);
-	return { valid: false, errors };
+	// percentage mode
+	const result = BudgetCategoriesSchema.safeParse(categories);
+	if (result.success) return { valid: true, errors: [] };
+	return { valid: false, errors: result.error.issues.map((e) => e.message) };
 }
 
 export function calculateCategoryTotal(categories: BudgetCategory[]): number {

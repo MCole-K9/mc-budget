@@ -20,6 +20,7 @@
 	let currency = $state('USD');
 	let categories = $state<BudgetCategory[]>([]);
 	let selectedPresetId = $state<string | undefined>(undefined);
+	let budgetType = $state<'percentage' | 'fixed'>('percentage');
 	let loading = $state(false);
 	let error = $state('');
 
@@ -35,18 +36,36 @@
 		{ value: 'AUD', label: 'AUD - Australian Dollar' }
 	];
 
-	const categoriesValid = $derived(validateCategories(categories).valid);
+	const categoriesValid = $derived(validateCategories(categories, budgetType).valid);
 
 	function handlePresetSelect(preset: BudgetPreset) {
 		selectedPresetId = preset.id;
 		categories = JSON.parse(JSON.stringify(preset.categories));
+		// Presets are percentage-based; apply fixedAmount reset if user switched mode
+		if (budgetType === 'fixed') {
+			categories = categories.map((c) => ({ ...c, percentage: 0, fixedAmount: 0 }));
+		}
 		step = 'customize';
 	}
 
 	function handleCustomBudget() {
 		selectedPresetId = undefined;
-		categories = [{ name: 'Category 1', percentage: 100, color: '#3B82F6' }];
+		if (budgetType === 'fixed') {
+			categories = [{ name: 'Category 1', percentage: 0, fixedAmount: 0, color: '#3B82F6' }];
+		} else {
+			categories = [{ name: 'Category 1', percentage: 100, color: '#3B82F6' }];
+		}
 		step = 'customize';
+	}
+
+	function switchToFixed() {
+		budgetType = 'fixed';
+		categories = categories.map((c) => ({ ...c, percentage: 0, fixedAmount: c.fixedAmount ?? 0 }));
+	}
+
+	function switchToPercentage() {
+		budgetType = 'percentage';
+		categories = categories.map((c) => ({ ...c, fixedAmount: undefined }));
 	}
 
 	async function handleSubmit(e: Event) {
@@ -54,7 +73,9 @@
 		error = '';
 
 		if (!categoriesValid) {
-			error = 'Categories must total exactly 100%';
+			error = budgetType === 'fixed'
+				? 'Each category must have a fixed amount greater than 0'
+				: 'Categories must total exactly 100%';
 			return;
 		}
 
@@ -65,6 +86,7 @@
 				name: name.trim(),
 				balance: Number(balance) || 0,
 				currency,
+				budget_type: budgetType,
 				categories
 			});
 			await goto(resolve('/wallets/[id]', { id: wallet.id }));
@@ -83,7 +105,7 @@
 <AuthGuard>
 	{#snippet children()}
 		<div class="max-w-4xl mx-auto">
-			<h1 class="text-3xl font-bold mb-6">Create New Wallet</h1>
+			<h1 class="text-2xl font-bold mb-6">Create New Wallet</h1>
 
 			{#if error}
 				<Alert type="error" dismissible ondismiss={() => (error = '')} class="mb-6">
@@ -109,12 +131,35 @@
 			{#if step === 'preset'}
 				<div class="space-y-6">
 					<p class="text-base-content/70">
-						Choose a budget template to get started, or create a custom budget.
+						{#if budgetType === 'fixed'}
+							Choose a category template to get started, or build from scratch.
+						{:else}
+							Choose a budget template to get started, or create a custom budget.
+						{/if}
 					</p>
+
+					<!-- Budget type selection -->
+					<div class="flex gap-2">
+						<button
+							type="button"
+							class={['btn btn-sm flex-1', budgetType === 'percentage' ? 'btn-primary' : 'btn-ghost']}
+							onclick={() => (budgetType = 'percentage')}
+						>
+							% of Income
+						</button>
+						<button
+							type="button"
+							class={['btn btn-sm flex-1', budgetType === 'fixed' ? 'btn-primary' : 'btn-ghost']}
+							onclick={() => (budgetType = 'fixed')}
+						>
+							Fixed Amounts
+						</button>
+					</div>
 
 					<BudgetPresetSelector
 						{presets}
 						selected={selectedPresetId}
+						{budgetType}
 						onselect={handlePresetSelect}
 					/>
 
@@ -128,10 +173,14 @@
 				<Card title="Customize Your Budget">
 					{#snippet children()}
 						<p class="text-base-content/70 mb-4">
-							Adjust categories and percentages. Total must equal 100%.
+							{#if budgetType === 'fixed'}
+								Set a fixed monthly spending limit for each category.
+							{:else}
+								Adjust categories and percentages. Total must equal 100%.
+							{/if}
 						</p>
 
-						<BudgetCategoryList bind:categories editable />
+						<BudgetCategoryList bind:categories editable {budgetType} />
 
 						<div class="flex gap-2 mt-6">
 							<Button variant="ghost" onclick={() => (step = 'preset')}>Back</Button>
@@ -183,7 +232,7 @@
 											class="badge"
 											style="background-color: {category.color}; color: white;"
 										>
-											{category.name}: {category.percentage}%
+											{category.name}: {budgetType === "fixed" ? (category.fixedAmount ?? 0) : category.percentage + "%"}
 										</span>
 									{/each}
 								</div>

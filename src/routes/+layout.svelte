@@ -26,13 +26,15 @@
 </svelte:head>
 
 <div class="min-h-screen bg-base-200">
-	<nav class="navbar bg-base-100 shadow-sm">
+	<nav class="navbar bg-base-100 border-b border-base-200">
 		<div class="flex-1">
 			<a href={resolve('/')} class="btn btn-ghost text-xl">MC Budget</a>
 		</div>
 		<div class="flex-none gap-2">
 			{#if auth.isAuthenticated}
 				<a href={resolve('/wallets')} class="btn btn-ghost btn-sm">Wallets</a>
+				<a href={resolve('/transactions')} class="btn btn-ghost btn-sm">Transactions</a>
+				<a href={resolve('/reports')} class="btn btn-ghost btn-sm">Reports</a>
 				<a href={resolve('/presets')} class="btn btn-ghost btn-sm">Presets</a>
 				<div class="dropdown dropdown-end">
 					<div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar placeholder">
@@ -46,6 +48,7 @@
 						class="menu menu-sm dropdown-content bg-base-100 rounded-box z-10 mt-3 w-52 p-2 shadow"
 					>
 						<li><span class="font-medium">{auth.user?.name}</span></li>
+						<li><a href={resolve('/settings')}>Settings</a></li>
 						<li><button onclick={handleLogout}>Logout</button></li>
 					</ul>
 				</div>

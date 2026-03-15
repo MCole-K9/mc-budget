@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { query, command } from '$app/server';
 import { getPb } from '$lib/server/db';
-import { CreateWalletInputSchema, WalletSchema, TransactionSchema } from '$lib/schemas/budget';
+import { CreateWalletInputSchema, WalletSchema, TransactionSchema, UpdatePeriodPrefsInputSchema } from '$lib/schemas/budget';
 
 export const getWallets = query(async () => {
 	const records = await getPb().collection('wallets').getFullList({ sort: '-created' });
@@ -18,6 +18,16 @@ export const createWallet = command(CreateWalletInputSchema, async (input) => {
 	const user = pb.authStore.record;
 	if (!user) throw new Error('User must be authenticated to create a wallet');
 
+	// Server-side validation based on budget_type
+	if (input.budget_type === 'percentage') {
+		const total = input.categories.reduce((sum, c) => sum + c.percentage, 0);
+		if (Math.abs(total - 100) >= 0.01) throw new Error('Categories must total exactly 100%');
+	} else {
+		if (input.categories.some((c) => !c.fixedAmount || c.fixedAmount <= 0)) {
+			throw new Error('All fixed-amount categories must have an amount greater than 0');
+		}
+	}
+
 	const record = await pb.collection('wallets').create({
 		user: user.id,
 		name: input.name.trim(),
@@ -25,6 +35,7 @@ export const createWallet = command(CreateWalletInputSchema, async (input) => {
 		initial_balance: input.balance,
 		total_funded: input.balance,
 		currency: input.currency,
+		budget_type: input.budget_type,
 		categories: input.categories
 	});
 
@@ -45,6 +56,16 @@ export const updateWalletBalance = command(
 		return WalletSchema.parse(record);
 	}
 );
+
+export const updatePeriodPrefs = command(UpdatePeriodPrefsInputSchema, async ({ id, default_period, saved_periods, cycle_start_day }) => {
+	const record = await getPb().collection('wallets').update(id, {
+		...(default_period !== undefined && { default_period }),
+		...(saved_periods !== undefined && { saved_periods }),
+		...(cycle_start_day !== undefined && { cycle_start_day })
+	});
+	getWallet(id).refresh();
+	return WalletSchema.parse(record);
+});
 
 export const recalculateBalance = command(z.string(), async (walletId) => {
 	const pb = getPb();

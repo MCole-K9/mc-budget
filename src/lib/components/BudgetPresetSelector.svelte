@@ -5,10 +5,11 @@
 	interface Props {
 		presets: BudgetPreset[];
 		selected?: string;
+		budgetType?: 'percentage' | 'fixed';
 		onselect: (preset: BudgetPreset) => void;
 	}
 
-	let { presets, selected, onselect }: Props = $props();
+	let { presets, selected, budgetType = 'percentage', onselect }: Props = $props();
 </script>
 
 <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -32,7 +33,7 @@
 								class="badge badge-sm"
 								style="background-color: {category.color}; color: white;"
 							>
-								{category.name}: {category.percentage}%
+								{category.name}{budgetType === 'percentage' ? ': ' + category.percentage + '%' : ''}
 							</span>
 						{/each}
 					</div>

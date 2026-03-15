@@ -69,7 +69,7 @@
 <div class="max-w-4xl mx-auto">
 	<div class="flex justify-between items-start mb-6">
 		<div>
-			<h1 class="text-3xl font-bold">Budget Presets</h1>
+			<h1 class="text-2xl font-bold">Budget Presets</h1>
 			<p class="text-base-content/70 mt-2">
 				Browse proven budget templates. Choose one when creating a new wallet.
 			</p>

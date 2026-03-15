@@ -4,6 +4,7 @@ import { z } from 'zod';
 export const BudgetCategorySchema = z.object({
 	name: z.string().min(1, 'Category name is required').max(100),
 	percentage: z.number().min(0).max(100),
+	fixedAmount: z.number().min(0).optional(),
 	color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Color must be a valid hex color (#RRGGBB)')
 });
 
@@ -37,7 +38,8 @@ export const CreateWalletInputSchema = z.object({
 		.length(3, 'Currency must be a 3-letter code')
 		.regex(/^[A-Z]{3}$/, 'Currency must be uppercase letters')
 		.transform((v) => v.toUpperCase()),
-	categories: BudgetCategoriesSchema
+	budget_type: z.enum(['percentage', 'fixed']).default('percentage'),
+	categories: z.array(BudgetCategorySchema).min(1, 'At least one category is required')
 });
 
 export type CreateWalletInput = z.infer<typeof CreateWalletInputSchema>;
@@ -76,6 +78,23 @@ export const RegisterInputSchema = z
 
 export type RegisterInput = z.infer<typeof RegisterInputSchema>;
 
+// Saved custom date range
+export const SavedPeriodSchema = z.object({
+	name: z.string().min(1).max(100),
+	startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+	endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+});
+
+export type SavedPeriod = z.infer<typeof SavedPeriodSchema>;
+
+// Update period preferences input
+export const UpdatePeriodPrefsInputSchema = z.object({
+	id: z.string().min(1),
+	default_period: z.string().optional(),
+	saved_periods: z.array(SavedPeriodSchema).optional(),
+	cycle_start_day: z.number().int().min(1).max(28).optional()
+});
+
 // Wallet Schema (from database)
 export const WalletSchema = z.object({
 	id: z.string(),
@@ -86,6 +105,10 @@ export const WalletSchema = z.object({
 	total_funded: z.number().catch(0),
 	currency: z.string(),
 	categories: z.array(BudgetCategorySchema),
+	default_period: z.string().catch(''),
+	saved_periods: z.array(SavedPeriodSchema).catch([]),
+	cycle_start_day: z.number().catch(1),
+	budget_type: z.enum(['percentage', 'fixed']).catch('percentage'),
 	created: z.string(),
 	updated: z.string()
 });
@@ -99,8 +122,11 @@ export const TransactionSchema = z.object({
 	category: z.string(),
 	amount: z.number(),
 	description: z.string(),
-	date: z.string(),
+	date: z.string().transform((d) => d.split('T')[0].split(' ')[0]),
 	receipt: z.string().catch(''),
+	recurring: z.boolean().catch(false),
+	recur_day: z.number().catch(0),
+	recurring_source_id: z.string().catch(''),
 	created: z.string()
 });
 

@@ -1,18 +1,19 @@
 <script lang="ts">
 	import type { BudgetCategory } from '$lib/types/budget';
-	import { calculateCategoryTotal } from '$lib/validation/budget';
+	import { calculateCategoryTotal, validateCategories } from '$lib/validation/budget';
 	import BudgetCategoryInput from './BudgetCategoryInput.svelte';
 
 	interface Props {
 		categories: BudgetCategory[];
 		editable?: boolean;
+		budgetType?: 'percentage' | 'fixed';
 		onchange?: (categories: BudgetCategory[]) => void;
 	}
 
-	let { categories = $bindable(), editable = true, onchange }: Props = $props();
+	let { categories = $bindable(), editable = true, budgetType = 'percentage', onchange }: Props = $props();
 
 	const total = $derived(calculateCategoryTotal(categories));
-	const isValid = $derived(Math.abs(total - 100) < 0.01);
+	const isValid = $derived(validateCategories(categories, budgetType).valid);
 
 	const defaultColors = [
 		'#3B82F6',
@@ -49,6 +50,7 @@
 	{#each categories as category, index (index)}
 		<BudgetCategoryInput
 			bind:category={categories[index]}
+			{budgetType}
 			onchange={handleCategoryChange}
 			onremove={editable && categories.length > 1 ? () => removeCategory(index) : undefined}
 		/>
@@ -60,14 +62,16 @@
 		</button>
 	{/if}
 
-	<div
-		class={['flex justify-between items-center p-2 rounded-lg', isValid ? 'bg-success/10 text-success' : 'bg-error/10 text-error']}
-	>
-		<span class="font-medium">Total:</span>
-		<span class="font-bold">{total.toFixed(1)}%</span>
-	</div>
+	{#if budgetType !== 'fixed'}
+		<div
+			class={['flex justify-between items-center p-2 rounded-lg', isValid ? 'bg-success/10 text-success' : 'bg-error/10 text-error']}
+		>
+			<span class="font-medium">Total:</span>
+			<span class="font-bold">{total.toFixed(1)}%</span>
+		</div>
 
-	{#if !isValid}
-		<p class="text-sm text-error">Categories must total exactly 100%</p>
+		{#if !isValid}
+			<p class="text-sm text-error">Categories must total exactly 100%</p>
+		{/if}
 	{/if}
 </div>
