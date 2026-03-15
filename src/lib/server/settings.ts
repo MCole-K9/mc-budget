@@ -1,5 +1,5 @@
 import { withAdminPb } from './db';
-import { ANTHROPIC_API_KEY } from '$env/static/private';
+import { env as privateEnv } from '$env/dynamic/private';
 import { AI_PROVIDERS, type AiProvider } from '$lib/settings';
 
 // Allowlist: only lowercase letters, digits, and underscores.
@@ -53,7 +53,7 @@ export async function getAiKey(provider: AiProvider): Promise<string> {
 	const key = await getSetting(`${provider}_api_key`);
 	if (key) return key;
 	// Fallback: env var for anthropic (backwards compat)
-	if (provider === 'anthropic') return ANTHROPIC_API_KEY;
+	if (provider === 'anthropic') return privateEnv.ANTHROPIC_API_KEY ?? '';
 	return '';
 }
 
