@@ -27,6 +27,7 @@ export async function getAdminPb(): Promise<PocketBase> {
 	if (Date.now() > _adminAuthExpiry) {
 		if (!_adminAuthPromise) {
 			_adminAuthPromise = (async () => {
+				_adminPb!.authStore.clear();
 				await _adminPb!.collection('_superusers').authWithPassword(PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD);
 				_adminAuthExpiry = Date.now() + 11 * 60 * 60 * 1000; // re-auth after 11h (tokens last 12h)
 			})().finally(() => {
@@ -36,4 +37,23 @@ export async function getAdminPb(): Promise<PocketBase> {
 		await _adminAuthPromise;
 	}
 	return _adminPb;
+}
+
+/**
+ * Runs `fn` with an admin-authenticated PocketBase instance.
+ * If the server rejects the token (e.g., DB was wiped without restarting the server),
+ * the stale token is cleared and the call is retried once after re-authenticating.
+ */
+export async function withAdminPb<T>(fn: (pb: PocketBase) => Promise<T>): Promise<T> {
+	try {
+		return await fn(await getAdminPb());
+	} catch (e: unknown) {
+		const status = (e as { status?: number })?.status;
+		if (status === 401 || status === 403) {
+			_adminAuthExpiry = 0;
+			_adminPb?.authStore.clear();
+			return fn(await getAdminPb());
+		}
+		throw e;
+	}
 }

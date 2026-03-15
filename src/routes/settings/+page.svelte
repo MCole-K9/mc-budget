@@ -1,10 +1,13 @@
 <script lang="ts">
-	import { getAiSettings, saveProviderKey, setActiveProvider } from '$lib/settings.remote';
+	import { getAiSettings, saveProviderKey, setActiveProvider, getFinancialSettings, setBaseCurrency } from '$lib/settings.remote';
 	import { AI_PROVIDERS, PROVIDER_LABELS, PROVIDER_MODELS } from '$lib/settings';
 	import type { AiProvider } from '$lib/settings';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 
-	const initial = await getAiSettings();
+	const [initial, { baseCurrency: initBase }] = await Promise.all([getAiSettings(), getFinancialSettings()]);
+	let baseCurrencyInput = $state(initBase);
+	let savingBase = $state(false);
+	let baseSaved = $state(false);
 
 	let activeProvider = $state(initial.activeProvider);
 	let configured = $state({ ...initial.keys });
@@ -34,6 +37,18 @@
 		}
 	}
 
+	async function handleSaveBaseCurrency() {
+		if (baseCurrencyInput.trim().length !== 3) return;
+		savingBase = true;
+		try {
+			await setBaseCurrency(baseCurrencyInput.trim().toUpperCase());
+			baseSaved = true;
+			setTimeout(() => { baseSaved = false; }, 3000);
+		} finally {
+			savingBase = false;
+		}
+	}
+
 	async function handleSetActive(provider: AiProvider) {
 		activating = provider;
 		errors[provider] = '';
@@ -56,6 +71,39 @@
 	{#snippet children()}
 		<div class="max-w-3xl mx-auto space-y-6">
 			<h1 class="text-2xl font-bold">Settings</h1>
+
+			<div>
+				<h2 class="text-xs font-semibold text-base-content/40 uppercase tracking-widest mb-3">
+					Financial Settings
+				</h2>
+				<p class="text-sm text-base-content/50 mb-4">
+					Base currency for unified totals in reports. Exchange rates fetched from open.er-api.com (free, cached 1 hr).
+				</p>
+				<div class="flex items-center gap-2 max-w-xs">
+					<input
+						type="text"
+						maxlength="3"
+						class="input input-bordered input-sm w-20 uppercase"
+						bind:value={baseCurrencyInput}
+						oninput={() => (baseCurrencyInput = baseCurrencyInput.toUpperCase())}
+						onkeydown={(e) => e.key === 'Enter' && handleSaveBaseCurrency()}
+					/>
+					<button
+						class="btn btn-sm btn-primary"
+						disabled={baseCurrencyInput.length !== 3 || savingBase}
+						onclick={handleSaveBaseCurrency}
+					>
+						{#if savingBase}
+							<span class="loading loading-spinner loading-xs"></span>
+						{:else}
+							Save
+						{/if}
+					</button>
+					{#if baseSaved}
+						<span class="text-xs text-success">✓ Saved</span>
+					{/if}
+				</div>
+			</div>
 
 			<div>
 				<h2 class="text-xs font-semibold text-base-content/40 uppercase tracking-widest mb-3">

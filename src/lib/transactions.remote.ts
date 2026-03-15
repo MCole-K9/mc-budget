@@ -221,6 +221,29 @@ export const getReport = query(GetReportInputSchema, async (input) => {
 	topExpenses.sort((a, b) => b.amount - a.amount);
 	topExpenses.splice(10);
 
+	// Add initial_balance to income for wallets that fall within the query period
+	const seenWallets = new Map<string, { currency: string; initial_balance: number; created: string }>();
+	for (const r of records) {
+		const wid = String(r.wallet);
+		if (!seenWallets.has(wid)) {
+			const w = r.expand?.['wallet'] as Record<string, unknown> | undefined;
+			if (w) seenWallets.set(wid, {
+				currency: String(w.currency ?? 'USD'),
+				initial_balance: Number(w.initial_balance) || 0,
+				created: String(w.created ?? '').split('T')[0].split(' ')[0]
+			});
+		}
+	}
+	for (const [, w] of seenWallets) {
+		if (!w.initial_balance) continue;
+		const inRange = !input.startDate ||
+			(w.created >= input.startDate && w.created <= (input.endDate ?? '9999-12-31'));
+		if (inRange) {
+			if (!byCurrency[w.currency]) byCurrency[w.currency] = { income: 0, expense: 0 };
+			byCurrency[w.currency].income += w.initial_balance;
+		}
+	}
+
 	return { byCurrency, byCategory, byMonth, topExpenses };
 });
 

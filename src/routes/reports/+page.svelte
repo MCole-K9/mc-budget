@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { getWallets, getWallet } from '$lib/wallets.remote';
 	import { getReport } from '$lib/transactions.remote';
+	import { getFinancialSettings, getExchangeRates } from '$lib/settings.remote';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import ChartCanvas from '$lib/components/ChartCanvas.svelte';
 	import type { ChartConfiguration } from 'chart.js';
@@ -22,6 +23,8 @@
 	const showDateInputs = $derived(selectedPeriod === 'custom');
 
 	const wallets = await getWallets();
+	const { baseCurrency } = await getFinancialSettings();
+	const { rates } = await getExchangeRates(baseCurrency);
 
 	function getDateRange(period: string): { startDate?: string; endDate?: string } {
 		const now = new Date();
@@ -56,6 +59,18 @@
 	);
 
 	const summaryEntries = $derived(Object.entries(report.byCurrency));
+
+	const showConvertedTotal = $derived(summaryEntries.length > 1);
+
+	const convertedTotal = $derived((() => {
+		let income = 0, expense = 0;
+		for (const [currency, data] of summaryEntries) {
+			const r = rates[currency] ?? 1;
+			income += data.income / r;
+			expense += data.expense / r;
+		}
+		return { income, expense, net: income - expense };
+	})());
 
 	function formatCurrency(amount: number, currency: string): string {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(amount);
@@ -96,10 +111,21 @@
 	});
 
 	// ── Grouped bar: income vs expenses by month ───────────────────────────────
+	// When multiple currencies are present, convert all to base currency for a unified view.
+	const trendCurrency = $derived(showConvertedTotal ? baseCurrency : primaryCurrency);
+
 	const trendConfig = $derived<ChartConfiguration>({
 		type: 'bar',
 		data: (() => {
 			const months = Object.keys(report.byMonth).sort();
+			const getMonthValue = (month: string, field: 'income' | 'expense') => {
+				if (showConvertedTotal) {
+					return Object.entries(report.byMonth[month] ?? {}).reduce((sum, [currency, data]) => {
+						return sum + data[field] / (rates[currency] ?? 1);
+					}, 0);
+				}
+				return report.byMonth[month]?.[primaryCurrency]?.[field] ?? 0;
+			};
 			return {
 				labels: months.map(m =>
 					new Date(m + '-02').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
@@ -107,7 +133,7 @@
 				datasets: [
 					{
 						label: 'Income',
-						data: months.map(m => report.byMonth[m]?.[primaryCurrency]?.income ?? 0),
+						data: months.map(m => getMonthValue(m, 'income')),
 						backgroundColor: '#22c55e66',
 						borderColor: '#22c55e',
 						borderWidth: 1,
@@ -115,7 +141,7 @@
 					},
 					{
 						label: 'Expenses',
-						data: months.map(m => report.byMonth[m]?.[primaryCurrency]?.expense ?? 0),
+						data: months.map(m => getMonthValue(m, 'expense')),
 						backgroundColor: '#ef444466',
 						borderColor: '#ef4444',
 						borderWidth: 1,
@@ -130,12 +156,12 @@
 				legend: { position: 'top', labels: { boxWidth: 12, padding: 12, font: { size: 12 } } },
 				tooltip: {
 					callbacks: {
-						label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y ?? 0, primaryCurrency)}`
+						label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y ?? 0, trendCurrency)}`
 					}
 				}
 			},
 			scales: {
-				y: { beginAtZero: true, ticks: { callback: (v) => formatCurrency(Number(v), primaryCurrency) } },
+				y: { beginAtZero: true, ticks: { callback: (v) => formatCurrency(Number(v), trendCurrency) } },
 				x: { grid: { display: false } }
 			}
 		}
@@ -270,6 +296,25 @@
 						</div>
 					</div>
 				{/each}
+			{#if showConvertedTotal}
+				{@const net = convertedTotal.net}
+				<div class="grid grid-cols-3 gap-3 border-t border-base-200/60 pt-3">
+					<div class="rounded-2xl bg-base-200/40 p-4">
+						<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-1">Total Income ({baseCurrency})</p>
+						<p class="text-xl font-bold text-success tabular-nums">{formatCurrency(convertedTotal.income, baseCurrency)}</p>
+					</div>
+					<div class="rounded-2xl bg-base-200/40 p-4">
+						<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-1">Total Expenses ({baseCurrency})</p>
+						<p class="text-xl font-bold text-error tabular-nums">{formatCurrency(convertedTotal.expense, baseCurrency)}</p>
+					</div>
+					<div class="rounded-2xl bg-base-200/40 p-4">
+						<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-1">Total Net ({baseCurrency})</p>
+						<p class="text-xl font-bold tabular-nums {net >= 0 ? 'text-success' : 'text-error'}">
+							{net >= 0 ? '+' : ''}{formatCurrency(Math.abs(net), baseCurrency)}
+						</p>
+					</div>
+				</div>
+			{/if}
 			{/if}
 
 			<!-- Charts row: Donut + Budget vs Actual -->

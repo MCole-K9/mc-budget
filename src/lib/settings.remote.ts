@@ -7,8 +7,11 @@ import {
 	getAiKey,
 	getAiProvider,
 	setAiKey,
-	setAiProvider
+	setAiProvider,
+	getBaseCurrency,
+	setBaseCurrency as _setBaseCurrency
 } from '$lib/server/settings';
+import { fetchRates } from '$lib/server/exchangeRates';
 
 function requireAuth() {
 	const user = getPb().authStore.record;
@@ -55,3 +58,22 @@ export const setActiveProvider = command(
 		return { success: true };
 	}
 );
+
+export const getFinancialSettings = query(async () => {
+	requireAuth();
+	return { baseCurrency: await getBaseCurrency() };
+});
+
+export const setBaseCurrency = command(
+	z.string().length(3, 'Must be a 3-letter currency code'),
+	async (currency) => {
+		requireAuth();
+		await _setBaseCurrency(currency);
+		return { success: true };
+	}
+);
+
+export const getExchangeRates = query(z.string(), async (baseCurrency) => {
+	requireAuth();
+	return { rates: await fetchRates(baseCurrency) };
+});
