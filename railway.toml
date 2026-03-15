@@ -1,0 +1,15 @@
+# SvelteKit service config
+# In Railway dashboard: set this as the config file for your "sveltekit" service
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[build.args]
+# Uses Railway private networking — must match the name of your PocketBase service in Railway
+PUBLIC_POCKETBASE_URL = "http://pocketbase.railway.internal:8090"
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
