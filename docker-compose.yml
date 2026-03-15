@@ -21,9 +21,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        PUBLIC_POCKETBASE_URL: http://pocketbase:8090
     environment:
+      PUBLIC_POCKETBASE_URL: ${PUBLIC_POCKETBASE_URL:-http://pocketbase:8090}
       PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL}
       PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}

@@ -5,12 +5,6 @@ WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
-# PUBLIC_POCKETBASE_URL is baked in at build time.
-# The app only accesses PocketBase server-side, so the internal
-# Docker network hostname is correct here.
-ARG PUBLIC_POCKETBASE_URL=http://pocketbase:8090
-ENV PUBLIC_POCKETBASE_URL=$PUBLIC_POCKETBASE_URL
-
 COPY . .
 RUN bun run build
 

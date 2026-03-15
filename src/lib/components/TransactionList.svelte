@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { PUBLIC_POCKETBASE_URL } from '$env/static/public';
+	import { env } from '$env/dynamic/public';
 	import type { Transaction, Wallet } from '$lib/types/budget';
 
 	interface Props {
@@ -39,7 +39,7 @@
 
 	function getReceiptUrl(transaction: Transaction): string | null {
 		if (!transaction.receipt) return null;
-		return `${PUBLIC_POCKETBASE_URL}/api/files/transactions/${transaction.id}/${transaction.receipt}`;
+		return `${env.PUBLIC_POCKETBASE_URL}/api/files/transactions/${transaction.id}/${transaction.receipt}`;
 	}
 
 	const grouped = $derived(

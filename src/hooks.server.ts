@@ -1,7 +1,7 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { resolve } from '$app/paths';
-import { PUBLIC_POCKETBASE_URL } from '$env/static/public';
+import { env } from '$env/dynamic/public';
 import PocketBase from 'pocketbase';
 
 const guestOnlyRoutes: string[] = [resolve('/auth/login'), resolve('/auth/register')];
@@ -32,7 +32,7 @@ function isGuestOnlyRoute(pathname: string) {
 }
 
 export const handle: Handle = async ({ event, resolve: resolveRequest }) => {
-	event.locals.pb = new PocketBase(PUBLIC_POCKETBASE_URL || 'http://127.0.0.1:8090');
+	event.locals.pb = new PocketBase(env.PUBLIC_POCKETBASE_URL || 'http://127.0.0.1:8090');
 	event.locals.pb.authStore.loadFromCookie(event.request.headers.get('cookie') ?? '');
 	event.locals.user = null;
 

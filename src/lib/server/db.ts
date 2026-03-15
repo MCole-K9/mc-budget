@@ -1,9 +1,9 @@
 import PocketBase from 'pocketbase';
 import { getRequestEvent } from '$app/server';
-import { PUBLIC_POCKETBASE_URL } from '$env/static/public';
+import { env } from '$env/dynamic/public';
 import { PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD } from '$env/static/private';
 
-const PB_URL = PUBLIC_POCKETBASE_URL || 'http://127.0.0.1:8090';
+const PB_URL = env.PUBLIC_POCKETBASE_URL || 'http://127.0.0.1:8090';
 
 // Used in prerender (build-time, no request context)
 export const pb = new PocketBase(PB_URL);
