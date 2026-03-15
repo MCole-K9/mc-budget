@@ -26,6 +26,7 @@
 	let selectedCategory = $state(untrack(() => wallet.categories[0]?.name ?? ''));
 
 	// Receipt scan state
+	let selectedFile = $state<File | null>(null);
 	let scanLoading = $state(false);
 	let scanError = $state('');
 	let scanned = $state(false);
@@ -56,22 +57,24 @@
 		});
 	}
 
-	async function handleReceiptFile(e: Event) {
+	function handleReceiptFile(e: Event) {
 		const file = (e.currentTarget as HTMLInputElement).files?.[0];
-		if (!file || !file.type.startsWith('image/')) return;
+		selectedFile = file?.type.startsWith('image/') ? file : null;
+		scanned = false;
+		scanError = '';
+	}
 
+	async function handleScan() {
+		if (!selectedFile) return;
 		scanLoading = true;
 		scanError = '';
-		scanned = false;
-
 		try {
-			const base64 = await readAsBase64(file);
+			const base64 = await readAsBase64(selectedFile);
 			const result = await scanReceipt({
 				imageBase64: base64,
-				mimeType: file.type as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif',
+				mimeType: selectedFile.type as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif',
 				categories: wallet.categories.map((c) => c.name)
 			});
-
 			amount = result.amount;
 			description = result.description;
 			date = result.date;
@@ -98,13 +101,6 @@
 	<div class="form-control">
 		<div class="label">
 			<span class="label-text">Receipt</span>
-			{#if scanLoading}
-				<span class="label-text-alt flex items-center gap-1 text-base-content/50">
-					<span class="loading loading-spinner loading-xs"></span> Scanning…
-				</span>
-			{:else if scanned}
-				<span class="label-text-alt text-success">✓ Receipt scanned</span>
-			{/if}
 		</div>
 		<input
 			{...createTransaction.fields.receipt.as('file')}
@@ -112,9 +108,22 @@
 			class="file-input file-input-bordered w-full"
 			oninput={handleReceiptFile}
 		/>
-		{#if scanError}
+		{#if selectedFile}
 			<div class="label">
-				<span class="label-text-alt text-error">{scanError}</span>
+				{#if scanLoading}
+					<span class="label-text-alt flex items-center gap-1 text-base-content/50">
+						<span class="loading loading-spinner loading-xs"></span> Scanning…
+					</span>
+				{:else if scanned}
+					<span class="label-text-alt text-success">✓ Receipt scanned</span>
+				{:else}
+					<button type="button" class="btn btn-xs btn-ghost" onclick={handleScan}>
+						Scan with AI
+					</button>
+				{/if}
+				{#if scanError}
+					<span class="label-text-alt text-error">{scanError}</span>
+				{/if}
 			</div>
 		{/if}
 	</div>

@@ -15,11 +15,8 @@ const ScanReceiptInputSchema = z.object({
 });
 
 const ExtractedReceiptSchema = z.object({
-	amount: z.number().positive().describe('Total amount paid, positive number, no currency symbol'),
-	description: z
-		.string()
-		.max(80)
-		.describe('Merchant name or brief description of the purchase'),
+	amount: z.number().describe('Total amount paid, positive number, no currency symbol'),
+	description: z.string().describe('Merchant name or brief description of the purchase, max 80 chars'),
 	date: z.string().describe('Transaction date in YYYY-MM-DD format'),
 	suggestedCategory: z
 		.string()
@@ -70,7 +67,7 @@ export const scanReceipt = command(ScanReceiptInputSchema, async (input) => {
 				content: [
 					{
 						type: 'image',
-						image: `data:${input.mimeType};base64,${input.imageBase64}`
+						image: Buffer.from(input.imageBase64, 'base64')
 					},
 					{
 						type: 'text',
