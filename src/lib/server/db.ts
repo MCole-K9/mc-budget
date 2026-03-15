@@ -1,7 +1,7 @@
 import PocketBase from 'pocketbase';
 import { getRequestEvent } from '$app/server';
 import { env } from '$env/dynamic/public';
-import { PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD } from '$env/static/private';
+import { env as privateEnv } from '$env/dynamic/private';
 
 const PB_URL = env.PUBLIC_POCKETBASE_URL || 'http://127.0.0.1:8090';
 
@@ -28,7 +28,7 @@ export async function getAdminPb(): Promise<PocketBase> {
 		if (!_adminAuthPromise) {
 			_adminAuthPromise = (async () => {
 				_adminPb!.authStore.clear();
-				await _adminPb!.collection('_superusers').authWithPassword(PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD);
+				await _adminPb!.collection('_superusers').authWithPassword(privateEnv.PB_ADMIN_EMAIL, privateEnv.PB_ADMIN_PASSWORD);
 				_adminAuthExpiry = Date.now() + 11 * 60 * 60 * 1000; // re-auth after 11h (tokens last 12h)
 			})().finally(() => {
 				_adminAuthPromise = null;
