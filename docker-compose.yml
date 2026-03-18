@@ -26,7 +26,7 @@ services:
       PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL}
       PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      BODY_SIZE_LIMIT: ${BODY_SIZE_LIMIT:-5M}
+      BODY_SIZE_LIMIT: ${BODY_SIZE_LIMIT:-2M}
     ports:
       - "3000:3000"
     depends_on:
