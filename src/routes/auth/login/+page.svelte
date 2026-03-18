@@ -38,12 +38,12 @@
 			<div class="space-y-1.5">
 				<label class="text-sm font-medium text-base-content/70" for="password">Password</label>
 				<input
-					{...loginForm.fields.password.as('password')}
+					{...loginForm.fields._password.as('password')}
 					id="password"
 					class="input input-bordered w-full"
 					placeholder="Enter your password"
 				/>
-				{#each loginForm.fields.password.issues() as issue (issue.message)}
+				{#each loginForm.fields._password.issues() as issue (issue.message)}
 					<p class="text-xs text-error">{issue.message}</p>
 				{/each}
 			</div>

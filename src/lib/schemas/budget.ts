@@ -58,7 +58,7 @@ export type CreateTransactionInput = z.infer<typeof CreateTransactionInputSchema
 // Login Input Schema
 export const LoginInputSchema = z.object({
 	email: z.string().email('Invalid email address'),
-	password: z.string().min(1, 'Password is required')
+	_password: z.string().min(1, 'Password is required')
 });
 
 export type LoginInput = z.infer<typeof LoginInputSchema>;
@@ -67,13 +67,13 @@ export type LoginInput = z.infer<typeof LoginInputSchema>;
 export const RegisterInputSchema = z
 	.object({
 		email: z.string().email('Invalid email address'),
-		password: z.string().min(8, 'Password must be at least 8 characters'),
-		passwordConfirm: z.string(),
+		_password: z.string().min(8, 'Password must be at least 8 characters'),
+		_passwordConfirm: z.string(),
 		name: z.string().min(1, 'Name is required').max(100)
 	})
-	.refine((data) => data.password === data.passwordConfirm, {
+	.refine((data) => data._password === data._passwordConfirm, {
 		message: 'Passwords do not match',
-		path: ['passwordConfirm']
+		path: ['_passwordConfirm']
 	});
 
 export type RegisterInput = z.infer<typeof RegisterInputSchema>;

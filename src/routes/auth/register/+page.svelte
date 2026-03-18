@@ -51,12 +51,12 @@
 			<div class="space-y-1.5">
 				<label class="text-sm font-medium text-base-content/70" for="password">Password</label>
 				<input
-					{...registerForm.fields.password.as('password')}
+					{...registerForm.fields._password.as('password')}
 					id="password"
 					class="input input-bordered w-full"
 					placeholder="Create a password"
 				/>
-				{#each registerForm.fields.password.issues() as issue (issue.message)}
+				{#each registerForm.fields._password.issues() as issue (issue.message)}
 					<p class="text-xs text-error">{issue.message}</p>
 				{/each}
 			</div>
@@ -64,12 +64,12 @@
 			<div class="space-y-1.5">
 				<label class="text-sm font-medium text-base-content/70" for="passwordConfirm">Confirm Password</label>
 				<input
-					{...registerForm.fields.passwordConfirm.as('password')}
+					{...registerForm.fields._passwordConfirm.as('password')}
 					id="passwordConfirm"
 					class="input input-bordered w-full"
 					placeholder="Confirm your password"
 				/>
-				{#each registerForm.fields.passwordConfirm.issues() as issue (issue.message)}
+				{#each registerForm.fields._passwordConfirm.issues() as issue (issue.message)}
 					<p class="text-xs text-error">{issue.message}</p>
 				{/each}
 			</div>
