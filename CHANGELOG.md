@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.1](https://github.com/MCole-K9/mc-budget/compare/v1.0.0...v1.0.1) (2026-03-18)
+
+
+### Bug Fixes
+
+* file upload size limit ([#4](https://github.com/MCole-K9/mc-budget/issues/4)) ([e422996](https://github.com/MCole-K9/mc-budget/commit/e4229968b3e2f909f6261ddfda029f5aaa87fa91))
+* secure password handling by renaming fields in authentication schemas and forms ([#6](https://github.com/MCole-K9/mc-budget/issues/6)) ([2730350](https://github.com/MCole-K9/mc-budget/commit/273035094502c9228b794a9ffe2c5bbfdd722613))
+
 ## 1.0.0 (2026-03-15)
 
 
