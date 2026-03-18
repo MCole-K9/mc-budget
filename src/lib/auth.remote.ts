@@ -10,7 +10,7 @@ import { LoginInputSchema, RegisterInputSchema } from '$lib/schemas/budget';
  */
 export const login = form(LoginInputSchema, async (input) => {
 	try {
-		await getPb().collection('users').authWithPassword(input.email, input.password);
+		await getPb().collection('users').authWithPassword(input.email, input._password);
 	} catch {
 		invalid('Invalid email or password');
 	}
@@ -24,8 +24,8 @@ export const register = form(RegisterInputSchema, async (input) => {
 	try {
 		await getPb().collection('users').create({
 			email: input.email,
-			password: input.password,
-			passwordConfirm: input.passwordConfirm,
+			password: input._password,
+			passwordConfirm: input._passwordConfirm,
 			name: input.name || ''
 		});
 	} catch (err: any) {
@@ -35,7 +35,7 @@ export const register = form(RegisterInputSchema, async (input) => {
 		invalid('Failed to create account');
 	}
 
-	await getPb().collection('users').authWithPassword(input.email, input.password);
+	await getPb().collection('users').authWithPassword(input.email, input._password);
 	redirect(303, resolve('/wallets'));
 });
 
