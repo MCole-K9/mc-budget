@@ -57,11 +57,19 @@
 		});
 	}
 
+	const MAX_RECEIPT_SIZE = 2 * 1024 * 1024; // 2MB
+
 	function handleReceiptFile(e: Event) {
 		const file = (e.currentTarget as HTMLInputElement).files?.[0];
-		selectedFile = file?.type.startsWith('image/') ? file : null;
 		scanned = false;
 		scanError = '';
+		if (file && file.size > MAX_RECEIPT_SIZE) {
+			selectedFile = null;
+			scanError = `Receipt is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum size is 2 MB.`;
+			(e.currentTarget as HTMLInputElement).value = '';
+			return;
+		}
+		selectedFile = file?.type.startsWith('image/') ? file : null;
 	}
 
 	async function handleScan() {
@@ -108,7 +116,11 @@
 			class="file-input file-input-bordered w-full"
 			oninput={handleReceiptFile}
 		/>
-		{#if selectedFile}
+		{#if scanError}
+			<div class="label">
+				<span class="label-text-alt text-error">{scanError}</span>
+			</div>
+		{:else if selectedFile}
 			<div class="label">
 				{#if scanLoading}
 					<span class="label-text-alt flex items-center gap-1 text-base-content/50">
@@ -120,9 +132,6 @@
 					<button type="button" class="btn btn-xs btn-ghost" onclick={handleScan}>
 						Scan with AI
 					</button>
-				{/if}
-				{#if scanError}
-					<span class="label-text-alt text-error">{scanError}</span>
 				{/if}
 			</div>
 		{/if}
