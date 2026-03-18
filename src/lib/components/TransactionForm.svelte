@@ -116,7 +116,11 @@
 			class="file-input file-input-bordered w-full"
 			oninput={handleReceiptFile}
 		/>
-		{#if selectedFile}
+		{#if scanError}
+			<div class="label">
+				<span class="label-text-alt text-error">{scanError}</span>
+			</div>
+		{:else if selectedFile}
 			<div class="label">
 				{#if scanLoading}
 					<span class="label-text-alt flex items-center gap-1 text-base-content/50">
@@ -128,9 +132,6 @@
 					<button type="button" class="btn btn-xs btn-ghost" onclick={handleScan}>
 						Scan with AI
 					</button>
-				{/if}
-				{#if scanError}
-					<span class="label-text-alt text-error">{scanError}</span>
 				{/if}
 			</div>
 		{/if}
