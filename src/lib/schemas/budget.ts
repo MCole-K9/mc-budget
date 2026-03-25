@@ -127,6 +127,7 @@ export const TransactionSchema = z.object({
 	recurring: z.boolean().catch(false),
 	recur_day: z.number().catch(0),
 	recurring_source_id: z.string().catch(''),
+	transfer_id: z.string().catch(''),
 	created: z.string()
 });
 
@@ -155,6 +156,29 @@ export const UserSchema = z.object({
 }).passthrough();
 
 export type User = z.infer<typeof UserSchema>;
+
+// Transfer form schema
+export const TransferFormSchema = z.object({
+	sourceWalletId: z.string().min(1, 'Source wallet required'),
+	destWalletId: z.string().min(1, 'Destination wallet required'),
+	amount: z.number().gt(0, 'Amount must be greater than 0'),
+	description: z.string().optional(),
+	date: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid date format')
+});
+
+export type TransferFormInput = z.infer<typeof TransferFormSchema>;
+
+// Update transaction schema
+export const UpdateTransactionInputSchema = z.object({
+	id: z.string().min(1),
+	walletId: z.string().min(1),
+	isExpense: z.boolean(),
+	category: z.string(),
+	incomeSource: z.string().optional(),
+	amount: z.number().gt(0, 'Amount must be greater than 0'),
+	description: z.string().optional(),
+	date: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid date format')
+});
 
 // Validate transaction category exists in wallet
 export function validateTransactionCategory(

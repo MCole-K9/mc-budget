@@ -88,6 +88,9 @@
 										{#if transaction.recurring}
 											<span class="text-base-content/30 text-xs ml-1" title="Recurring">↻</span>
 										{/if}
+										{#if transaction.transfer_id}
+											<span class="text-base-content/30 text-xs ml-1" title="Transfer">⇄</span>
+										{/if}
 									</p>
 									<p class="text-xs text-base-content/40 truncate">{transaction.category}</p>
 								</div>

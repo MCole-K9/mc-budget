@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { getWallet, deleteWallet, recalculateBalance, updatePeriodPrefs, updateCategoryColor } from '$lib/wallets.remote';
+	import { getWallet, getWallets, deleteWallet, recalculateBalance, updatePeriodPrefs, updateCategoryColor } from '$lib/wallets.remote';
 	import {
 		getTransactions,
 		getTransactionsPaged,
@@ -18,6 +18,7 @@
 	import TransactionList from '$lib/components/TransactionList.svelte';
 	import TransactionForm from '$lib/components/TransactionForm.svelte';
 	import EditTransactionForm from '$lib/components/EditTransactionForm.svelte';
+	import TransferForm from '$lib/components/TransferForm.svelte';
 
 	const BUILTIN_PERIODS: { value: string; label: string }[] = [
 		{ value: 'this-month', label: 'This Month' },
@@ -32,6 +33,7 @@
 	const RESERVED_PERIOD_VALUES = new Set(BUILTIN_PERIODS.map((p) => p.value));
 
 	let showAddTransaction = $state(false);
+	let showTransfer = $state(false);
 	let showDeleteConfirm = $state(false);
 	let deleteConfirmName = $state('');
 	let transactionToDelete = $state<Transaction | null>(null);
@@ -313,12 +315,9 @@
 </svelte:head>
 
 <AuthGuard>
-	{#snippet children()}
-		<div class="max-w-4xl mx-auto space-y-6">
-			{#if error}
-				<Alert type="error" dismissible ondismiss={() => (error = '')}>
-					{#snippet children()}{error}{/snippet}
-				</Alert>
+	<div class="max-w-4xl mx-auto space-y-6">
+		{#if error}
+			<Alert type="error" dismissible ondismiss={() => (error = '')}>{error}</Alert>
 			{/if}
 
 			<!-- Header -->
@@ -345,11 +344,14 @@
 						<Button variant="primary" size="sm" onclick={() => (showAddTransaction = true)}>
 							+ Add
 						</Button>
+						<Button variant="ghost" size="sm" onclick={() => (showTransfer = true)}>
+							⇄ Transfer
+						</Button>
 						<div class="dropdown dropdown-end">
 							<button tabindex="0" class="btn btn-ghost btn-sm btn-square" title="Wallet settings">
 								⚙
 							</button>
-							<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow-lg border border-base-200 w-48 p-1 z-10">
+							<ul class="dropdown-content menu bg-base-100 rounded-box shadow-lg border border-base-200 w-48 p-1 z-10">
 								<li>
 									<button class="text-error" onclick={() => (showDeleteConfirm = true)}>
 										Delete wallet
@@ -363,7 +365,6 @@
 
 			<!-- Budget Allocation -->
 			<Card title="Budget Allocation">
-				{#snippet children()}
 					<!-- Period income summary (percentage wallets only) -->
 					{#if wallet.budget_type !== 'fixed'}
 						<div class="flex justify-between items-center mb-5 pb-4 border-b border-base-200">
@@ -443,12 +444,10 @@
 							></div>
 						{/each}
 					</div>
-				{/snippet}
 			</Card>
 
 			<!-- Transactions -->
 			<Card title="Transactions">
-				{#snippet children()}
 					<!-- Period selector -->
 					<div class="space-y-2 mb-4">
 						<!-- Built-in periods -->
@@ -631,21 +630,18 @@
 							</div>
 						</div>
 					{/if}
-				{/snippet}
 			</Card>
 		</div>
 
 		<!-- Add Transaction Modal -->
 		<Modal bind:open={showAddTransaction} title="Add Transaction">
-			{#snippet children()}
-				<TransactionForm
+			<TransactionForm
 					{wallet}
 					onSuccess={() => {
 						showAddTransaction = false;
 						refreshPagedQuery();
 					}}
 				/>
-			{/snippet}
 		</Modal>
 
 		<!-- Delete Wallet Confirmation Modal -->
@@ -654,7 +650,6 @@
 			title="Delete Wallet?"
 			onclose={() => (deleteConfirmName = '')}
 		>
-			{#snippet children()}
 				<p class="text-base-content/70 mb-4">
 					This will permanently delete <strong>{wallet.name}</strong> and all its transactions.
 					This cannot be undone.
@@ -670,7 +665,6 @@
 						bind:value={deleteConfirmName}
 					/>
 				</label>
-			{/snippet}
 			{#snippet actions()}
 				<Button variant="ghost" onclick={() => { showDeleteConfirm = false; deleteConfirmName = ''; }}>
 					Cancel
@@ -687,24 +681,40 @@
 			title="Delete Transaction?"
 			onclose={() => (transactionToDelete = null)}
 		>
-			{#snippet children()}
 				<p class="text-base-content/70">
 					Are you sure you want to delete this transaction? This will reverse its effect on your
 					wallet balance.
 				</p>
-			{/snippet}
 			{#snippet actions()}
 				<Button variant="ghost" onclick={() => (transactionToDelete = null)}>Cancel</Button>
 				<Button variant="error" onclick={confirmDeleteTransaction}>Delete Transaction</Button>
 			{/snippet}
 		</Modal>
+		<!-- Transfer Modal -->
+		<Modal bind:open={showTransfer} title="Transfer Between Wallets">
+			<svelte:boundary>
+				{@const allWallets = await getWallets()}
+				<TransferForm
+					sourceWallet={wallet}
+					wallets={allWallets}
+					onSuccess={() => {
+						showTransfer = false;
+						refreshPagedQuery();
+					}}
+					onCancel={() => (showTransfer = false)}
+				/>
+				{#snippet pending()}
+					<span class="loading loading-spinner"></span>
+				{/snippet}
+			</svelte:boundary>
+		</Modal>
+
 		<!-- Edit Transaction Modal -->
 		<Modal
 			open={!!transactionToEdit}
 			title="Edit Transaction"
 			onclose={() => (transactionToEdit = null)}
 		>
-			{#snippet children()}
 				{#if transactionToEdit}
 					<EditTransactionForm
 						transaction={transactionToEdit}
@@ -716,7 +726,5 @@
 						onCancel={() => (transactionToEdit = null)}
 					/>
 				{/if}
-			{/snippet}
 		</Modal>
-	{/snippet}
 </AuthGuard>
