@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.1.0](https://github.com/MCole-K9/mc-budget/compare/v1.0.1...v1.1.0) (2026-03-25)
+
+
+### Features
+
+* add archived state to wallets with functionality to archive and unarchive wallets ([73e5652](https://github.com/MCole-K9/mc-budget/commit/73e565254242e2567d044ef8e411b6b4b5e360db))
+* add edit transaction functionality with form and update logic ([9d41c51](https://github.com/MCole-K9/mc-budget/commit/9d41c513d19abf64466fef26c5eba9de3f0fe7b3))
+* add updateCategoryColor functionality to modify category colors in wallets ([250b226](https://github.com/MCole-K9/mc-budget/commit/250b226f0ca5c84d888bbdb1556c3f12c5d33c20))
+* Edit transaction + Transfer Funds + Archive Wallet and Friends ([d5ac0ce](https://github.com/MCole-K9/mc-budget/commit/d5ac0ce89766cf9b8cce91560dd3638601e41f6f))
+* enhance delete wallet confirmation with input validation ([ed8d1d3](https://github.com/MCole-K9/mc-budget/commit/ed8d1d337acb249f34045c058aaf8a812a3f74cb))
+* implement computeTransferDeleteDeltas function and update transaction deletion logic for accurate balance adjustments ([811230f](https://github.com/MCole-K9/mc-budget/commit/811230f8c2dee839416624316a05feff1ac15259))
+* implement date range utility and refactor date handling in forms and reports ([ab2e7c3](https://github.com/MCole-K9/mc-budget/commit/ab2e7c3e664658405b5aa6f40acff232af2c75a6))
+* implement transfer functionality between wallets with validation and UI integration ([ce2bf29](https://github.com/MCole-K9/mc-budget/commit/ce2bf292cca2f1439a06daf21c95ee0ff40c068d))
+* prevent editing of transactions with transfer_id in TransactionList component ([3a64383](https://github.com/MCole-K9/mc-budget/commit/3a643833ff147da9a4700a67dd4b357b3c51be35))
+* refactor delete wallet button into dropdown menu for improved UI ([3403c27](https://github.com/MCole-K9/mc-budget/commit/3403c2762696168392706aebb4cd2f01bed9620f))
+* update wallet retrieval to include requestKey for consistency in create and update operations ([18e2774](https://github.com/MCole-K9/mc-budget/commit/18e27745a5d7a957c62c9744e84cc378360bf2a3))
+
 ## [1.0.1](https://github.com/MCole-K9/mc-budget/compare/v1.0.0...v1.0.1) (2026-03-18)
 
 
