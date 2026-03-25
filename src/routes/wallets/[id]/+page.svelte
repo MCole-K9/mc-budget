@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { getWallet, getWallets, deleteWallet, recalculateBalance, updatePeriodPrefs, updateCategoryColor } from '$lib/wallets.remote';
+	import { getWallet, getWallets, deleteWallet, archiveWallet, unarchiveWallet, recalculateBalance, updatePeriodPrefs, updateCategoryColor } from '$lib/wallets.remote';
 	import {
 		getTransactions,
 		getTransactionsPaged,
@@ -40,6 +40,7 @@
 	let transactionToDelete = $state<Transaction | null>(null);
 	let transactionToEdit = $state<Transaction | null>(null);
 	let reconciling = $state(false);
+	let archiving = $state(false);
 	let error = $state('');
 
 	const walletId = page.params.id!;
@@ -236,6 +237,29 @@
 		}
 	}
 
+	async function handleArchiveWallet() {
+		archiving = true;
+		try {
+			await archiveWallet(wallet.id);
+			await goto(resolve('/wallets'));
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to archive wallet';
+		} finally {
+			archiving = false;
+		}
+	}
+
+	async function handleUnarchiveWallet() {
+		archiving = true;
+		try {
+			await unarchiveWallet(wallet.id);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to unarchive wallet';
+		} finally {
+			archiving = false;
+		}
+	}
+
 	async function handleDeleteWallet() {
 		try {
 			await deleteWallet(wallet.id);
@@ -308,7 +332,12 @@
 				<a href={resolve('/wallets')} class="btn btn-ghost btn-sm mb-3 -ml-3">&larr; Wallets</a>
 				<div class="flex justify-between items-end">
 					<div>
-						<h1 class="text-2xl font-bold">{wallet.name}</h1>
+						<div class="flex items-center gap-2">
+							<h1 class="text-2xl font-bold">{wallet.name}</h1>
+							{#if wallet.archived}
+								<span class="badge badge-ghost text-xs">Archived</span>
+							{/if}
+						</div>
 						<div class="flex items-baseline gap-2 mt-1">
 							<p class="text-3xl font-bold text-primary tabular-nums">
 								{formatCurrency(wallet.balance, wallet.currency)}
@@ -335,6 +364,19 @@
 								⚙
 							</button>
 							<ul class="dropdown-content menu bg-base-100 rounded-box shadow-lg border border-base-200 w-48 p-1 z-10">
+								{#if wallet.archived}
+									<li>
+										<button onclick={handleUnarchiveWallet} disabled={archiving}>
+											{archiving ? 'Unarchiving…' : 'Unarchive wallet'}
+										</button>
+									</li>
+								{:else}
+									<li>
+										<button onclick={handleArchiveWallet} disabled={archiving}>
+											{archiving ? 'Archiving…' : 'Archive wallet'}
+										</button>
+									</li>
+								{/if}
 								<li>
 									<button class="text-error" onclick={() => (showDeleteConfirm = true)}>
 										Delete wallet

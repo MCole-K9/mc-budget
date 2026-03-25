@@ -4,12 +4,25 @@ import { getPb } from '$lib/server/db';
 import { CreateWalletInputSchema, WalletSchema, TransactionSchema, UpdatePeriodPrefsInputSchema } from '$lib/schemas/budget';
 
 export const getWallets = query(async () => {
-	const records = await getPb().collection('wallets').getFullList({ sort: '-created' });
+	const records = await getPb().collection('wallets').getFullList({
+		filter: 'archived = false || archived = null',
+		sort: '-created',
+		requestKey: null
+	});
+	return records.map((r) => WalletSchema.parse(r));
+});
+
+export const getArchivedWallets = query(async () => {
+	const records = await getPb().collection('wallets').getFullList({
+		filter: 'archived = true',
+		sort: '-created',
+		requestKey: null
+	});
 	return records.map((r) => WalletSchema.parse(r));
 });
 
 export const getWallet = query(z.string(), async (id) => {
-	const record = await getPb().collection('wallets').getOne(id);
+	const record = await getPb().collection('wallets').getOne(id, { requestKey: null });
 	return WalletSchema.parse(record);
 });
 
@@ -43,9 +56,25 @@ export const createWallet = command(CreateWalletInputSchema, async (input) => {
 	return WalletSchema.parse(record);
 });
 
+export const archiveWallet = command(z.string(), async (id) => {
+	await getPb().collection('wallets').update(id, { archived: true });
+	getWallets().refresh();
+	getArchivedWallets().refresh();
+	return { success: true };
+});
+
+export const unarchiveWallet = command(z.string(), async (id) => {
+	await getPb().collection('wallets').update(id, { archived: false });
+	getWallets().refresh();
+	getArchivedWallets().refresh();
+	getWallet(id).refresh();
+	return { success: true };
+});
+
 export const deleteWallet = command(z.string(), async (id) => {
 	await getPb().collection('wallets').delete(id);
 	getWallets().refresh();
+	getArchivedWallets().refresh();
 	return { success: true };
 });
 

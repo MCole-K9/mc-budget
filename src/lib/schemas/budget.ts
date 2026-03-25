@@ -109,6 +109,7 @@ export const WalletSchema = z.object({
 	saved_periods: z.array(SavedPeriodSchema).catch([]),
 	cycle_start_day: z.number().catch(1),
 	budget_type: z.enum(['percentage', 'fixed']).catch('percentage'),
+	archived: z.boolean().catch(false),
 	created: z.string(),
 	updated: z.string()
 });
