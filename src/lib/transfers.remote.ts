@@ -73,8 +73,7 @@ export const transferBetweenWallets = form(TransferFormSchema, async (input) => 
 		sourceWalletUpdated = true;
 
 		await pb.collection('wallets').update(input.destWalletId, {
-			balance: destWallet.balance + creditAmount,
-			total_funded: destWallet.total_funded + creditAmount
+			balance: destWallet.balance + creditAmount
 		}, { requestKey: null });
 		destWalletUpdated = true;
 	} catch (error) {
@@ -83,8 +82,7 @@ export const transferBetweenWallets = form(TransferFormSchema, async (input) => 
 		if (destWalletUpdated) {
 			try {
 				await pb.collection('wallets').update(input.destWalletId, {
-					balance: destWallet.balance,
-					total_funded: destWallet.total_funded
+					balance: destWallet.balance
 				}, { requestKey: null });
 			} catch {
 				rollbackErrors.push('destination wallet rollback failed');

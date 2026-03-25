@@ -94,7 +94,7 @@ export const recalculateBalance = command(z.string(), async (walletId) => {
 	});
 	const transactions = records.map((r) => TransactionSchema.parse(r));
 	const transactionSum = transactions.reduce((sum, t) => sum + t.amount, 0);
-	const incomeSum = transactions.filter((t) => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+	const incomeSum = transactions.filter((t) => t.amount > 0 && !t.transfer_id).reduce((sum, t) => sum + t.amount, 0);
 	const newBalance = wallet.initial_balance + transactionSum;
 	const newTotalFunded = wallet.initial_balance + incomeSum;
 	const updated = await pb.collection('wallets').update(walletId, {

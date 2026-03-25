@@ -664,10 +664,17 @@
 			title="Delete Transaction?"
 			onclose={() => (transactionToDelete = null)}
 		>
-				<p class="text-base-content/70">
-					Are you sure you want to delete this transaction? This will reverse its effect on your
-					wallet balance.
-				</p>
+				{#if transactionToDelete?.transfer_id}
+					<p class="text-base-content/70">
+						This is a <strong>transfer</strong>. Deleting it will also delete the linked transaction
+						in the other wallet and reverse the balance changes on both sides.
+					</p>
+				{:else}
+					<p class="text-base-content/70">
+						Are you sure you want to delete this transaction? This will reverse its effect on your
+						wallet balance.
+					</p>
+				{/if}
 			{#snippet actions()}
 				<Button variant="ghost" onclick={() => (transactionToDelete = null)}>Cancel</Button>
 				<Button variant="error" onclick={confirmDeleteTransaction}>Delete Transaction</Button>

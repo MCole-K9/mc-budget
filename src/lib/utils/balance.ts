@@ -1,4 +1,20 @@
 /**
+ * Computes the balance deltas to apply to each wallet when deleting a set of
+ * linked transfer transactions. Returns a map of walletId → balanceDelta.
+ * Reversing a debit (negative amount) adds back to the source wallet.
+ * Reversing a credit (positive amount) subtracts from the destination wallet.
+ */
+export function computeTransferDeleteDeltas(
+	transactions: { wallet: string; amount: number }[]
+): Map<string, number> {
+	const deltas = new Map<string, number>();
+	for (const tx of transactions) {
+		deltas.set(tx.wallet, (deltas.get(tx.wallet) ?? 0) + (-tx.amount));
+	}
+	return deltas;
+}
+
+/**
  * Computes the wallet field patch needed when a transaction's amount changes.
  * Handles balance delta and total_funded adjustments for income/expense transitions.
  */

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { TransferFormSchema, UpdateTransactionInputSchema, TransactionSchema } from './schemas/budget';
-import { computeWalletPatch } from './utils/balance';
+import { computeWalletPatch, computeTransferDeleteDeltas } from './utils/balance';
 
 // ── TransferFormSchema ─────────────────────────────────────────────────────
 
@@ -140,6 +140,44 @@ describe('TransactionSchema transfer_id', () => {
 	it('parses a transfer_id when present', () => {
 		const tx = TransactionSchema.parse({ ...base, transfer_id: 'uuid-abc-123' });
 		expect(tx.transfer_id).toBe('uuid-abc-123');
+	});
+});
+
+// ── computeTransferDeleteDeltas ────────────────────────────────────────────
+
+describe('computeTransferDeleteDeltas', () => {
+	it('reverses a standard debit/credit pair across two wallets', () => {
+		const deltas = computeTransferDeleteDeltas([
+			{ wallet: 'source', amount: -100 }, // debit
+			{ wallet: 'dest', amount: 100 }      // credit
+		]);
+		expect(deltas.get('source')).toBe(100);  // add back to source
+		expect(deltas.get('dest')).toBe(-100);   // remove from dest
+	});
+
+	it('handles currency conversion (credit differs from debit)', () => {
+		const deltas = computeTransferDeleteDeltas([
+			{ wallet: 'source', amount: -100 },
+			{ wallet: 'dest', amount: 85.5 } // converted amount
+		]);
+		expect(deltas.get('source')).toBe(100);
+		expect(deltas.get('dest')).toBe(-85.5);
+	});
+
+	it('handles orphaned transfer (only one transaction)', () => {
+		const deltas = computeTransferDeleteDeltas([
+			{ wallet: 'source', amount: -50 }
+		]);
+		expect(deltas.get('source')).toBe(50);
+		expect(deltas.get('dest')).toBeUndefined();
+	});
+
+	it('collapses deltas when both sides are in the same wallet', () => {
+		const deltas = computeTransferDeleteDeltas([
+			{ wallet: 'w1', amount: -100 },
+			{ wallet: 'w1', amount: 100 }
+		]);
+		expect(deltas.get('w1')).toBe(0);
 	});
 });
 

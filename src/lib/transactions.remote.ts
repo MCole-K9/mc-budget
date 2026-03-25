@@ -3,7 +3,7 @@ import { query, command, form } from '$app/server';
 import { invalid } from '@sveltejs/kit';
 import { getPb } from '$lib/server/db';
 import { TransactionSchema, WalletSchema, UpdateTransactionInputSchema } from '$lib/schemas/budget';
-import { computeWalletPatch } from '$lib/utils/balance';
+import { computeWalletPatch, computeTransferDeleteDeltas } from '$lib/utils/balance';
 import { getWallet } from '$lib/wallets.remote';
 
 export const getTransactions = query(z.string(), async (walletId) => {
@@ -135,14 +135,34 @@ export const getAllTransactionsSummary = query(GetAllTransactionsSummarySchema, 
 	});
 
 	const byCurrency: Record<string, { income: number; expense: number }> = {};
+	const seenWallets = new Map<string, { currency: string; initial_balance: number; created: string }>();
+
 	for (const r of records) {
-		if (r.transfer_id) continue;
-		const amount = Number(r.amount) || 0;
 		const w = r.expand?.['wallet'] as Record<string, unknown> | undefined;
 		const currency = String(w?.currency ?? 'USD');
+		const wid = String(r.wallet);
+		if (!seenWallets.has(wid) && w) {
+			seenWallets.set(wid, {
+				currency,
+				initial_balance: Number(w.initial_balance) || 0,
+				created: String(w.created ?? '').split('T')[0].split(' ')[0]
+			});
+		}
+		if (r.transfer_id) continue;
+		const amount = Number(r.amount) || 0;
 		if (!byCurrency[currency]) byCurrency[currency] = { income: 0, expense: 0 };
 		if (amount > 0) byCurrency[currency].income += amount;
 		else byCurrency[currency].expense += Math.abs(amount);
+	}
+
+	for (const [, w] of seenWallets) {
+		if (!w.initial_balance) continue;
+		const inRange = !input.startDate ||
+			(w.created >= input.startDate && w.created <= (input.endDate ?? '9999-12-31'));
+		if (inRange) {
+			if (!byCurrency[w.currency]) byCurrency[w.currency] = { income: 0, expense: 0 };
+			byCurrency[w.currency].income += w.initial_balance;
+		}
 	}
 
 	return { byCurrency };
@@ -402,21 +422,14 @@ export const deleteTransaction = command(
 				}
 			}
 
-			const walletDeltas = new Map<string, { balanceDelta: number; fundedDelta: number }>();
-			for (const tx of transferTransactions) {
-				const current = walletDeltas.get(tx.wallet) ?? { balanceDelta: 0, fundedDelta: 0 };
-				current.balanceDelta += -tx.amount;
-				if (tx.amount > 0) current.fundedDelta += -tx.amount;
-				walletDeltas.set(tx.wallet, current);
-			}
+			const walletDeltas = computeTransferDeleteDeltas(transferTransactions);
 
 			try {
-				for (const [walletToUpdate, delta] of walletDeltas) {
+				for (const [walletToUpdate, balanceDelta] of walletDeltas) {
 					const snapshot = walletSnapshots.get(walletToUpdate);
 					if (!snapshot) throw new Error('Missing wallet snapshot during transfer delete');
 					await pb.collection('wallets').update(walletToUpdate, {
-						balance: snapshot.balance + delta.balanceDelta,
-						total_funded: snapshot.total_funded + delta.fundedDelta
+						balance: snapshot.balance + balanceDelta
 					}, { requestKey: null });
 					touchedWallets.add(walletToUpdate);
 				}
@@ -433,8 +446,7 @@ export const deleteTransaction = command(
 					if (!snapshot) continue;
 					try {
 						await pb.collection('wallets').update(walletToRestore, {
-							balance: snapshot.balance,
-							total_funded: snapshot.total_funded
+							balance: snapshot.balance
 						}, { requestKey: null });
 					} catch {
 						rollbackErrors.push(`wallet rollback failed: ${walletToRestore}`);
