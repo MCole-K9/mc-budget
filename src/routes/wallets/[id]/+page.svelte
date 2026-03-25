@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { getWallet, deleteWallet, recalculateBalance, updatePeriodPrefs } from '$lib/wallets.remote';
+	import { getWallet, deleteWallet, recalculateBalance, updatePeriodPrefs, updateCategoryColor } from '$lib/wallets.remote';
 	import {
 		getTransactions,
 		getTransactionsPaged,
@@ -388,10 +388,18 @@
 							<div class="space-y-1">
 								<div class="flex items-center justify-between">
 									<div class="flex items-center gap-2">
-										<span
-											class="w-4 h-4 rounded"
+										<label
+											class="w-4 h-4 rounded cursor-pointer shrink-0"
 											style="background-color: {category.color};"
-										></span>
+											title="Change color"
+										>
+											<input
+												type="color"
+												value={category.color}
+												class="sr-only"
+												onchange={(e) => updateCategoryColor({ id: wallet.id, categoryName: category.name, color: e.currentTarget.value })}
+											/>
+										</label>
 										<span class="font-medium">{category.name}</span>
 										{#if wallet.budget_type !== "fixed"}<span class="text-base-content/60">{category.percentage}%</span>{/if}
 										{#if overBudget}

@@ -67,6 +67,25 @@ export const updatePeriodPrefs = command(UpdatePeriodPrefsInputSchema, async ({ 
 	return WalletSchema.parse(record);
 });
 
+export const updateCategoryColor = command(
+	z.object({
+		id: z.string(),
+		categoryName: z.string(),
+		color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Color must be a valid hex color')
+	}),
+	async ({ id, categoryName, color }) => {
+		const pb = getPb();
+		const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(id));
+		const categories = wallet.categories.map((c) =>
+			c.name === categoryName ? { ...c, color } : c
+		);
+		const record = await pb.collection('wallets').update(id, { categories });
+		getWallet(id).refresh();
+		getWallets().refresh();
+		return WalletSchema.parse(record);
+	}
+);
+
 export const recalculateBalance = command(z.string(), async (walletId) => {
 	const pb = getPb();
 	const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(walletId));
