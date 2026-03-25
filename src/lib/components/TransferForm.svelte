@@ -18,6 +18,11 @@
 	const destWallets = $derived(wallets.filter((w) => w.id !== sourceWallet.id));
 	const destOptions = $derived(destWallets.map((w) => ({ value: w.id, label: w.name })));
 	const notifySuccess = () => onSuccess?.();
+	const todayLocal = (() => {
+		const d = new Date();
+		const pad = (n: number) => String(n).padStart(2, '0');
+		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+	})();
 
 	let lastResultId = untrack(() => transferBetweenWallets.result?.debit?.id ?? '');
 
@@ -67,7 +72,7 @@
 			{...transferBetweenWallets.fields.date.as('date')}
 			label="Date"
 			required
-			value={new Date().toISOString().split('T')[0]}
+			value={todayLocal}
 		/>
 
 		<div class="flex gap-2">

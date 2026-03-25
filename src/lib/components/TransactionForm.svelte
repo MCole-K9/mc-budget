@@ -18,11 +18,16 @@
 	let isRecurring = $state(false);
 	let recurDay = $state(1);
 	let lastResultId = $state(createTransaction.result?.id ?? '');
+	const todayLocal = (() => {
+		const d = new Date();
+		const pad = (n: number) => String(n).padStart(2, '0');
+		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+	})();
 
 	// Pre-fillable form state
 	let amount = $state<number | ''>('');
 	let description = $state('');
-	let date = $state(new Date().toISOString().split('T')[0]);
+	let date = $state(todayLocal);
 	let selectedCategory = $state(untrack(() => wallet.categories[0]?.name ?? ''));
 
 	// Receipt scan state
