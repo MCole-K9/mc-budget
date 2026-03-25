@@ -309,6 +309,68 @@ export const createTransaction = form(CreateTransactionFormSchema, async (input)
 	return TransactionSchema.parse(record);
 });
 
+const UpdateTransactionInputSchema = z.object({
+	id: z.string().min(1),
+	walletId: z.string().min(1),
+	isExpense: z.boolean(),
+	category: z.string(),
+	incomeSource: z.string().optional(),
+	amount: z.number().gt(0, 'Amount must be greater than 0'),
+	description: z.string().optional(),
+	date: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid date format')
+});
+
+export const updateTransaction = command(UpdateTransactionInputSchema, async (input) => {
+	const pb = getPb();
+	const existing = TransactionSchema.parse(await pb.collection('transactions').getOne(input.id));
+	if (existing.wallet !== input.walletId) {
+		throw new Error('Transaction does not belong to the specified wallet');
+	}
+
+	const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(input.walletId));
+
+	const finalAmount = input.isExpense ? -Math.abs(input.amount) : Math.abs(input.amount);
+	const finalCategory = input.isExpense
+		? input.category
+		: input.incomeSource?.trim() || 'Income';
+
+	if (input.isExpense) {
+		const categoryExists = wallet.categories.some(
+			(c) => c.name.toLowerCase() === input.category.toLowerCase()
+		);
+		if (!categoryExists) {
+			throw new Error(`Category "${input.category}" does not exist in this wallet`);
+		}
+	}
+
+	await pb.collection('transactions').update(input.id, {
+		category: finalCategory,
+		amount: finalAmount,
+		description: input.description?.trim() || '',
+		date: input.date
+	});
+
+	// Adjust wallet balance by the difference
+	const balanceDelta = finalAmount - existing.amount;
+	const walletPatch: Record<string, number> = { balance: wallet.balance + balanceDelta };
+
+	// Adjust total_funded for income changes
+	if (existing.amount > 0 && finalAmount > 0) {
+		walletPatch.total_funded = wallet.total_funded + (finalAmount - existing.amount);
+	} else if (existing.amount > 0 && finalAmount <= 0) {
+		walletPatch.total_funded = wallet.total_funded - existing.amount;
+	} else if (existing.amount <= 0 && finalAmount > 0) {
+		walletPatch.total_funded = wallet.total_funded + finalAmount;
+	}
+
+	await pb.collection('wallets').update(input.walletId, walletPatch);
+
+	getTransactions(input.walletId).refresh();
+	getWallet(input.walletId).refresh();
+
+	return TransactionSchema.parse(await pb.collection('transactions').getOne(input.id));
+});
+
 export const deleteTransaction = command(
 	z.object({ id: z.string(), walletId: z.string() }),
 	async ({ id, walletId }) => {

@@ -6,9 +6,10 @@
 		transactions: Transaction[];
 		wallet: Wallet;
 		ondelete?: (transaction: Transaction) => void;
+		onedit?: (transaction: Transaction) => void;
 	}
 
-	let { transactions, wallet, ondelete }: Props = $props();
+	let { transactions, wallet, ondelete, onedit }: Props = $props();
 
 	function formatCurrency(amount: number): string {
 		return new Intl.NumberFormat('en-US', {
@@ -103,6 +104,13 @@
 											class="btn btn-ghost btn-xs text-base-content/30 hover:text-base-content/70"
 											title="View receipt"
 										>🧾</a>
+									{/if}
+									{#if onedit}
+										<button
+											class="btn btn-ghost btn-xs text-base-content/20 hover:text-base-content/70"
+											onclick={() => onedit(transaction)}
+											title="Edit transaction"
+										>✎</button>
 									{/if}
 									{#if ondelete}
 										<button

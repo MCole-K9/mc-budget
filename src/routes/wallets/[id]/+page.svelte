@@ -17,6 +17,7 @@
 	import Alert from '$lib/components/Alert.svelte';
 	import TransactionList from '$lib/components/TransactionList.svelte';
 	import TransactionForm from '$lib/components/TransactionForm.svelte';
+	import EditTransactionForm from '$lib/components/EditTransactionForm.svelte';
 
 	const BUILTIN_PERIODS: { value: string; label: string }[] = [
 		{ value: 'this-month', label: 'This Month' },
@@ -33,6 +34,7 @@
 	let showAddTransaction = $state(false);
 	let showDeleteConfirm = $state(false);
 	let transactionToDelete = $state<Transaction | null>(null);
+	let transactionToEdit = $state<Transaction | null>(null);
 	let reconciling = $state(false);
 	let error = $state('');
 
@@ -230,6 +232,10 @@
 
 	function handleDeleteTransaction(transaction: Transaction) {
 		transactionToDelete = transaction;
+	}
+
+	function handleEditTransaction(transaction: Transaction) {
+		transactionToEdit = transaction;
 	}
 
 	async function confirmDeleteTransaction() {
@@ -593,6 +599,7 @@
 						transactions={pagedResult.items}
 						{wallet}
 						ondelete={handleDeleteTransaction}
+						onedit={handleEditTransaction}
 					/>
 
 					<!-- Pagination -->
@@ -656,6 +663,26 @@
 			{#snippet actions()}
 				<Button variant="ghost" onclick={() => (transactionToDelete = null)}>Cancel</Button>
 				<Button variant="error" onclick={confirmDeleteTransaction}>Delete Transaction</Button>
+			{/snippet}
+		</Modal>
+		<!-- Edit Transaction Modal -->
+		<Modal
+			open={!!transactionToEdit}
+			title="Edit Transaction"
+			onclose={() => (transactionToEdit = null)}
+		>
+			{#snippet children()}
+				{#if transactionToEdit}
+					<EditTransactionForm
+						transaction={transactionToEdit}
+						{wallet}
+						onSuccess={() => {
+							transactionToEdit = null;
+							refreshPagedQuery();
+						}}
+						onCancel={() => (transactionToEdit = null)}
+					/>
+				{/if}
 			{/snippet}
 		</Modal>
 	{/snippet}
