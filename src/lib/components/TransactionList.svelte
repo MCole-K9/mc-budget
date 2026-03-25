@@ -108,7 +108,7 @@
 											title="View receipt"
 										>🧾</a>
 									{/if}
-									{#if onedit}
+									{#if onedit && !transaction.transfer_id}
 										<button
 											class="btn btn-ghost btn-xs text-base-content/20 hover:text-base-content/70"
 											onclick={() => onedit(transaction)}

@@ -9,7 +9,8 @@ import { getWallet } from '$lib/wallets.remote';
 export const getTransactions = query(z.string(), async (walletId) => {
 	const records = await getPb().collection('transactions').getFullList({
 		filter: `wallet = "${walletId}"`,
-		sort: '-date,-created'
+		sort: '-date,-created',
+		requestKey: null
 	});
 	return records.map((r) => TransactionSchema.parse(r));
 });
