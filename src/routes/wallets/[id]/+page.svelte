@@ -345,9 +345,18 @@
 						<Button variant="primary" size="sm" onclick={() => (showAddTransaction = true)}>
 							+ Add
 						</Button>
-						<Button variant="ghost" size="sm" outline onclick={() => (showDeleteConfirm = true)}>
-							Delete
-						</Button>
+						<div class="dropdown dropdown-end">
+							<button tabindex="0" class="btn btn-ghost btn-sm btn-square" title="Wallet settings">
+								⚙
+							</button>
+							<ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow-lg border border-base-200 w-48 p-1 z-10">
+								<li>
+									<button class="text-error" onclick={() => (showDeleteConfirm = true)}>
+										Delete wallet
+									</button>
+								</li>
+							</ul>
+						</div>
 					</div>
 				</div>
 			</div>
