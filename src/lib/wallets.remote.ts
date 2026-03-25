@@ -104,7 +104,7 @@ export const updateCategoryColor = command(
 	}),
 	async ({ id, categoryName, color }) => {
 		const pb = getPb();
-		const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(id));
+		const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(id, { requestKey: null }));
 		const categories = wallet.categories.map((c) =>
 			c.name === categoryName ? { ...c, color } : c
 		);
@@ -117,9 +117,10 @@ export const updateCategoryColor = command(
 
 export const recalculateBalance = command(z.string(), async (walletId) => {
 	const pb = getPb();
-	const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(walletId));
+	const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(walletId, { requestKey: null }));
 	const records = await pb.collection('transactions').getFullList({
-		filter: `wallet = "${walletId}"`
+		filter: `wallet = "${walletId}"`,
+		requestKey: null
 	});
 	const transactions = records.map((r) => TransactionSchema.parse(r));
 	const transactionSum = transactions.reduce((sum, t) => sum + t.amount, 0);

@@ -291,7 +291,7 @@ const CreateTransactionFormSchema = z.object({
 
 export const createTransaction = form(CreateTransactionFormSchema, async (input) => {
 	const pb = getPb();
-	const walletRecord = await pb.collection('wallets').getOne(input.walletId);
+	const walletRecord = await pb.collection('wallets').getOne(input.walletId, { requestKey: null });
 	const wallet = WalletSchema.parse(walletRecord);
 
 	const isExpense = input.isExpense === 'true';
