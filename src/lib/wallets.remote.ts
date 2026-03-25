@@ -58,23 +58,23 @@ export const createWallet = command(CreateWalletInputSchema, async (input) => {
 
 export const archiveWallet = command(z.string(), async (id) => {
 	await getPb().collection('wallets').update(id, { archived: true });
-	getWallets().refresh();
-	getArchivedWallets().refresh();
+	// getWallets().refresh();
+	// getArchivedWallets().refresh();
 	return { success: true };
 });
 
 export const unarchiveWallet = command(z.string(), async (id) => {
 	await getPb().collection('wallets').update(id, { archived: false });
-	getWallets().refresh();
-	getArchivedWallets().refresh();
+	// getWallets().refresh();
+	// getArchivedWallets().refresh();
 	getWallet(id).refresh();
 	return { success: true };
 });
 
 export const deleteWallet = command(z.string(), async (id) => {
 	await getPb().collection('wallets').delete(id);
-	getWallets().refresh();
-	getArchivedWallets().refresh();
+	// getWallets().refresh();
+	// getArchivedWallets().refresh();
 	return { success: true };
 });
 
@@ -110,7 +110,7 @@ export const updateCategoryColor = command(
 		);
 		const record = await pb.collection('wallets').update(id, { categories });
 		getWallet(id).refresh();
-		getWallets().refresh();
+		// getWallets().refresh();
 		return WalletSchema.parse(record);
 	}
 );
@@ -132,6 +132,6 @@ export const recalculateBalance = command(z.string(), async (walletId) => {
 		total_funded: newTotalFunded
 	});
 	getWallet(walletId).refresh();
-	getWallets().refresh();
+	// getWallets().refresh();
 	return WalletSchema.parse(updated);
 });
