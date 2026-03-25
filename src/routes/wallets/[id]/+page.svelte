@@ -33,6 +33,7 @@
 
 	let showAddTransaction = $state(false);
 	let showDeleteConfirm = $state(false);
+	let deleteConfirmName = $state('');
 	let transactionToDelete = $state<Transaction | null>(null);
 	let transactionToEdit = $state<Transaction | null>(null);
 	let reconciling = $state(false);
@@ -631,18 +632,33 @@
 		</Modal>
 
 		<!-- Delete Wallet Confirmation Modal -->
-		<Modal bind:open={showDeleteConfirm} title="Delete Wallet?">
+		<Modal
+			bind:open={showDeleteConfirm}
+			title="Delete Wallet?"
+			onclose={() => (deleteConfirmName = '')}
+		>
 			{#snippet children()}
-				<p class="text-base-content/70">
-					Are you sure you want to delete "{wallet.name}"? This action cannot be undone
-					and all transactions will be lost.
+				<p class="text-base-content/70 mb-4">
+					This will permanently delete <strong>{wallet.name}</strong> and all its transactions.
+					This cannot be undone.
 				</p>
+				<label class="form-control w-full">
+					<div class="label">
+						<span class="label-text text-sm">Type <strong>{wallet.name}</strong> to confirm</span>
+					</div>
+					<input
+						type="text"
+						class="input input-bordered w-full"
+						placeholder={wallet.name}
+						bind:value={deleteConfirmName}
+					/>
+				</label>
 			{/snippet}
 			{#snippet actions()}
-				<Button variant="ghost" onclick={() => (showDeleteConfirm = false)}>
+				<Button variant="ghost" onclick={() => { showDeleteConfirm = false; deleteConfirmName = ''; }}>
 					Cancel
 				</Button>
-				<Button variant="error" onclick={handleDeleteWallet}>
+				<Button variant="error" onclick={handleDeleteWallet} disabled={deleteConfirmName !== wallet.name}>
 					Delete Wallet
 				</Button>
 			{/snippet}
