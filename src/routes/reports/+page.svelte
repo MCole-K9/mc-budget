@@ -3,6 +3,7 @@
 	import { getWallets, getWallet } from '$lib/wallets.remote';
 	import { getReport } from '$lib/transactions.remote';
 	import { getFinancialSettings, getExchangeRates } from '$lib/settings.remote';
+	import { getStandardPeriodRange } from '$lib/utils/dateRange';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import ChartCanvas from '$lib/components/ChartCanvas.svelte';
 	import type { ChartConfiguration } from 'chart.js';
@@ -27,21 +28,8 @@
 	const { rates } = await getExchangeRates(baseCurrency);
 
 	function getDateRange(period: string): { startDate?: string; endDate?: string } {
-		const now = new Date();
-		const pad = (n: number) => String(n).padStart(2, '0');
-		const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-		if (period === 'this-month') return { startDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`, endDate: today };
-		if (period === 'last-month') {
-			const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-			const m = now.getMonth() === 0 ? 12 : now.getMonth();
-			return { startDate: `${y}-${pad(m)}-01`, endDate: `${y}-${pad(m)}-${pad(new Date(y, m, 0).getDate())}` };
-		}
-		if (period === 'last-3-months') {
-			const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-			return { startDate: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-01`, endDate: today };
-		}
-		if (period === 'this-year') return { startDate: `${now.getFullYear()}-01-01`, endDate: today };
-		if (period === 'all-time') return {};
+		const standardRange = getStandardPeriodRange(period);
+		if (standardRange) return standardRange;
 		return { startDate: customStartDate || undefined, endDate: customEndDate || undefined };
 	}
 

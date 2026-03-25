@@ -4,12 +4,25 @@ import { getPb } from '$lib/server/db';
 import { CreateWalletInputSchema, WalletSchema, TransactionSchema, UpdatePeriodPrefsInputSchema } from '$lib/schemas/budget';
 
 export const getWallets = query(async () => {
-	const records = await getPb().collection('wallets').getFullList({ sort: '-created' });
+	const records = await getPb().collection('wallets').getFullList({
+		filter: 'archived = false || archived = null',
+		sort: '-created',
+		requestKey: null
+	});
+	return records.map((r) => WalletSchema.parse(r));
+});
+
+export const getArchivedWallets = query(async () => {
+	const records = await getPb().collection('wallets').getFullList({
+		filter: 'archived = true',
+		sort: '-created',
+		requestKey: null
+	});
 	return records.map((r) => WalletSchema.parse(r));
 });
 
 export const getWallet = query(z.string(), async (id) => {
-	const record = await getPb().collection('wallets').getOne(id);
+	const record = await getPb().collection('wallets').getOne(id, { requestKey: null });
 	return WalletSchema.parse(record);
 });
 
@@ -43,9 +56,25 @@ export const createWallet = command(CreateWalletInputSchema, async (input) => {
 	return WalletSchema.parse(record);
 });
 
+export const archiveWallet = command(z.string(), async (id) => {
+	await getPb().collection('wallets').update(id, { archived: true });
+	getWallets().refresh();
+	getArchivedWallets().refresh();
+	return { success: true };
+});
+
+export const unarchiveWallet = command(z.string(), async (id) => {
+	await getPb().collection('wallets').update(id, { archived: false });
+	getWallets().refresh();
+	getArchivedWallets().refresh();
+	getWallet(id).refresh();
+	return { success: true };
+});
+
 export const deleteWallet = command(z.string(), async (id) => {
 	await getPb().collection('wallets').delete(id);
 	getWallets().refresh();
+	getArchivedWallets().refresh();
 	return { success: true };
 });
 
@@ -67,15 +96,35 @@ export const updatePeriodPrefs = command(UpdatePeriodPrefsInputSchema, async ({ 
 	return WalletSchema.parse(record);
 });
 
+export const updateCategoryColor = command(
+	z.object({
+		id: z.string(),
+		categoryName: z.string(),
+		color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Color must be a valid hex color')
+	}),
+	async ({ id, categoryName, color }) => {
+		const pb = getPb();
+		const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(id, { requestKey: null }));
+		const categories = wallet.categories.map((c) =>
+			c.name === categoryName ? { ...c, color } : c
+		);
+		const record = await pb.collection('wallets').update(id, { categories });
+		getWallet(id).refresh();
+		getWallets().refresh();
+		return WalletSchema.parse(record);
+	}
+);
+
 export const recalculateBalance = command(z.string(), async (walletId) => {
 	const pb = getPb();
-	const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(walletId));
+	const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(walletId, { requestKey: null }));
 	const records = await pb.collection('transactions').getFullList({
-		filter: `wallet = "${walletId}"`
+		filter: `wallet = "${walletId}"`,
+		requestKey: null
 	});
 	const transactions = records.map((r) => TransactionSchema.parse(r));
 	const transactionSum = transactions.reduce((sum, t) => sum + t.amount, 0);
-	const incomeSum = transactions.filter((t) => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+	const incomeSum = transactions.filter((t) => t.amount > 0 && !t.transfer_id).reduce((sum, t) => sum + t.amount, 0);
 	const newBalance = wallet.initial_balance + transactionSum;
 	const newTotalFunded = wallet.initial_balance + incomeSum;
 	const updated = await pb.collection('wallets').update(walletId, {

@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { getWallets } from '$lib/wallets.remote';
+	import { getWallets, getArchivedWallets } from '$lib/wallets.remote';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import WalletCard from '$lib/components/WalletCard.svelte';
 	import Button from '$lib/components/Button.svelte';
 
 	const wallets = $derived(await getWallets());
+
+	let showArchived = $state(false);
 </script>
 
 <svelte:head>
@@ -37,6 +39,38 @@
 					{/each}
 				</div>
 			{/if}
+
+			<!-- Archived wallets -->
+			<div class="mt-8">
+				<button
+					class="flex items-center gap-2 text-sm text-base-content/40 hover:text-base-content/70 transition-colors"
+					onclick={() => (showArchived = !showArchived)}
+				>
+					<span>{showArchived ? '▾' : '▸'}</span>
+					<span>Archived wallets</span>
+				</button>
+
+				{#if showArchived}
+					<svelte:boundary>
+						{@const archived = await getArchivedWallets()}
+						{#if archived.length === 0}
+							<p class="text-sm text-base-content/30 mt-3 pl-4">No archived wallets.</p>
+						{:else}
+							<div class="grid gap-4 md:grid-cols-2 mt-3 opacity-60">
+								{#each archived as wallet (wallet.id)}
+									<WalletCard
+										{wallet}
+										onclick={() => goto(resolve('/wallets/[id]', { id: wallet.id }))}
+									/>
+								{/each}
+							</div>
+						{/if}
+						{#snippet pending()}
+							<span class="loading loading-spinner loading-sm mt-3 ml-4"></span>
+						{/snippet}
+					</svelte:boundary>
+				{/if}
+			</div>
 		</div>
 	{/snippet}
 </AuthGuard>

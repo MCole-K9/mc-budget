@@ -2,13 +2,15 @@ import { z } from 'zod';
 import { query, command, form } from '$app/server';
 import { invalid } from '@sveltejs/kit';
 import { getPb } from '$lib/server/db';
-import { TransactionSchema, WalletSchema } from '$lib/schemas/budget';
+import { TransactionSchema, WalletSchema, UpdateTransactionInputSchema } from '$lib/schemas/budget';
+import { computeWalletPatch, computeTransferDeleteDeltas } from '$lib/utils/balance';
 import { getWallet } from '$lib/wallets.remote';
 
 export const getTransactions = query(z.string(), async (walletId) => {
 	const records = await getPb().collection('transactions').getFullList({
 		filter: `wallet = "${walletId}"`,
-		sort: '-date,-created'
+		sort: '-date,-created',
+		requestKey: null
 	});
 	return records.map((r) => TransactionSchema.parse(r));
 });
@@ -26,7 +28,7 @@ export const getTransactionSummary = query(GetTransactionSummarySchema, async (i
 
 	const records = await getPb().collection('transactions').getFullList({
 		filter,
-		fields: 'amount,category',
+		fields: 'amount,category,transfer_id',
 		requestKey: null
 	});
 
@@ -34,6 +36,7 @@ export const getTransactionSummary = query(GetTransactionSummarySchema, async (i
 	const spendingByCategory: Record<string, number> = {};
 
 	for (const r of records) {
+		if (r.transfer_id) continue;
 		const amount = Number(r.amount) || 0;
 		if (amount > 0) {
 			income += amount;
@@ -126,19 +129,40 @@ export const getAllTransactionsSummary = query(GetAllTransactionsSummarySchema, 
 
 	const records = await getPb().collection('transactions').getFullList({
 		filter: filter || undefined,
-		fields: 'amount,wallet',
+		fields: 'amount,wallet,transfer_id',
 		expand: 'wallet',
 		requestKey: null
 	});
 
 	const byCurrency: Record<string, { income: number; expense: number }> = {};
+	const seenWallets = new Map<string, { currency: string; initial_balance: number; created: string }>();
+
 	for (const r of records) {
-		const amount = Number(r.amount) || 0;
 		const w = r.expand?.['wallet'] as Record<string, unknown> | undefined;
 		const currency = String(w?.currency ?? 'USD');
+		const wid = String(r.wallet);
+		if (!seenWallets.has(wid) && w) {
+			seenWallets.set(wid, {
+				currency,
+				initial_balance: Number(w.initial_balance) || 0,
+				created: String(w.created ?? '').split('T')[0].split(' ')[0]
+			});
+		}
+		if (r.transfer_id) continue;
+		const amount = Number(r.amount) || 0;
 		if (!byCurrency[currency]) byCurrency[currency] = { income: 0, expense: 0 };
 		if (amount > 0) byCurrency[currency].income += amount;
 		else byCurrency[currency].expense += Math.abs(amount);
+	}
+
+	for (const [, w] of seenWallets) {
+		if (!w.initial_balance) continue;
+		const inRange = !input.startDate ||
+			(w.created >= input.startDate && w.created <= (input.endDate ?? '9999-12-31'));
+		if (inRange) {
+			if (!byCurrency[w.currency]) byCurrency[w.currency] = { income: 0, expense: 0 };
+			byCurrency[w.currency].income += w.initial_balance;
+		}
 	}
 
 	return { byCurrency };
@@ -180,6 +204,7 @@ export const getReport = query(GetReportInputSchema, async (input) => {
 	const topExpenses: TopExpense[] = [];
 
 	for (const r of records) {
+		const isTransfer = !!r.transfer_id;
 		const amount = Number(r.amount) || 0;
 		const date = String(r.date).split('T')[0].split(' ')[0];
 		const month = date.slice(0, 7);
@@ -189,22 +214,26 @@ export const getReport = query(GetReportInputSchema, async (input) => {
 		const category = String(r.category);
 		const color = cats.find((c) => c.name.toLowerCase() === category.toLowerCase())?.color ?? '#9ca3af';
 
-		if (!byCurrency[currency]) byCurrency[currency] = { income: 0, expense: 0 };
-		if (amount > 0) byCurrency[currency].income += amount;
-		else byCurrency[currency].expense += Math.abs(amount);
+		if (!isTransfer) {
+			if (!byCurrency[currency]) byCurrency[currency] = { income: 0, expense: 0 };
+			if (amount > 0) byCurrency[currency].income += amount;
+			else byCurrency[currency].expense += Math.abs(amount);
+		}
 
-		if (amount < 0) {
+		if (!isTransfer && amount < 0) {
 			if (!byCategory[currency]) byCategory[currency] = {};
 			if (!byCategory[currency][category]) byCategory[currency][category] = { spent: 0, color };
 			byCategory[currency][category].spent += Math.abs(amount);
 		}
 
-		if (!byMonth[month]) byMonth[month] = {};
-		if (!byMonth[month][currency]) byMonth[month][currency] = { income: 0, expense: 0 };
-		if (amount > 0) byMonth[month][currency].income += amount;
-		else byMonth[month][currency].expense += Math.abs(amount);
+		if (!isTransfer) {
+			if (!byMonth[month]) byMonth[month] = {};
+			if (!byMonth[month][currency]) byMonth[month][currency] = { income: 0, expense: 0 };
+			if (amount > 0) byMonth[month][currency].income += amount;
+			else byMonth[month][currency].expense += Math.abs(amount);
+		}
 
-		if (amount < 0) {
+		if (!isTransfer && amount < 0) {
 			topExpenses.push({
 				id: String(r.id),
 				description: String(r.description || ''),
@@ -262,7 +291,7 @@ const CreateTransactionFormSchema = z.object({
 
 export const createTransaction = form(CreateTransactionFormSchema, async (input) => {
 	const pb = getPb();
-	const walletRecord = await pb.collection('wallets').getOne(input.walletId);
+	const walletRecord = await pb.collection('wallets').getOne(input.walletId, { requestKey: null });
 	const wallet = WalletSchema.parse(walletRecord);
 
 	const isExpense = input.isExpense === 'true';
@@ -309,18 +338,157 @@ export const createTransaction = form(CreateTransactionFormSchema, async (input)
 	return TransactionSchema.parse(record);
 });
 
+export const updateTransaction = command(UpdateTransactionInputSchema, async (input) => {
+	const pb = getPb();
+	const existing = TransactionSchema.parse(
+		await pb.collection('transactions').getOne(input.id, { requestKey: null })
+	);
+	if (existing.wallet !== input.walletId) {
+		throw new Error('Transaction does not belong to the specified wallet');
+	}
+
+	const wallet = WalletSchema.parse(
+		await pb.collection('wallets').getOne(input.walletId, { requestKey: null })
+	);
+
+	const finalAmount = input.isExpense ? -Math.abs(input.amount) : Math.abs(input.amount);
+	const finalCategory = input.isExpense
+		? input.category
+		: input.incomeSource?.trim() || 'Income';
+
+	if (input.isExpense) {
+		const categoryExists = wallet.categories.some(
+			(c) => c.name.toLowerCase() === input.category.toLowerCase()
+		);
+		if (!categoryExists) {
+			throw new Error(`Category "${input.category}" does not exist in this wallet`);
+		}
+	}
+
+	await pb.collection('transactions').update(input.id, {
+		category: finalCategory,
+		amount: finalAmount,
+		description: input.description?.trim() || '',
+		date: input.date
+	});
+
+	const walletPatch = computeWalletPatch(existing.amount, finalAmount, wallet.balance, wallet.total_funded);
+	await pb.collection('wallets').update(input.walletId, walletPatch);
+
+	getTransactions(input.walletId).refresh();
+	getWallet(input.walletId).refresh();
+
+	return TransactionSchema.parse(
+		await pb.collection('transactions').getOne(input.id, { requestKey: null })
+	);
+});
+
 export const deleteTransaction = command(
 	z.object({ id: z.string(), walletId: z.string() }),
 	async ({ id, walletId }) => {
 		const pb = getPb();
-		const transaction = TransactionSchema.parse(await pb.collection('transactions').getOne(id));
+		const transaction = TransactionSchema.parse(
+			await pb.collection('transactions').getOne(id, { requestKey: null })
+		);
 		if (transaction.wallet !== walletId) {
 			throw new Error('Transaction does not belong to the specified wallet');
 		}
 
-		const wallet = WalletSchema.parse(await pb.collection('wallets').getOne(transaction.wallet));
+		const wallet = WalletSchema.parse(
+			await pb.collection('wallets').getOne(transaction.wallet, { requestKey: null })
+		);
 
-		await pb.collection('transactions').delete(id);
+		// If this is a transfer, also delete and reverse the linked counterpart
+		if (transaction.transfer_id) {
+			const linked = (await pb.collection('transactions').getFullList({
+				filter: `transfer_id = "${transaction.transfer_id}" && id != "${id}"`,
+				requestKey: null
+			})).map((r) => TransactionSchema.parse(r));
+
+			const transferTransactions = [transaction, ...linked];
+			const walletSnapshots = new Map<string, { balance: number; total_funded: number }>();
+			const touchedWallets = new Set<string>();
+			const deletedTransactions: typeof transferTransactions = [];
+
+			for (const tx of transferTransactions) {
+				if (!walletSnapshots.has(tx.wallet)) {
+					const w = WalletSchema.parse(
+						await pb.collection('wallets').getOne(tx.wallet, { requestKey: null })
+					);
+					walletSnapshots.set(tx.wallet, {
+						balance: w.balance,
+						total_funded: w.total_funded
+					});
+				}
+			}
+
+			const walletDeltas = computeTransferDeleteDeltas(transferTransactions);
+
+			try {
+				for (const [walletToUpdate, balanceDelta] of walletDeltas) {
+					const snapshot = walletSnapshots.get(walletToUpdate);
+					if (!snapshot) throw new Error('Missing wallet snapshot during transfer delete');
+					await pb.collection('wallets').update(walletToUpdate, {
+						balance: snapshot.balance + balanceDelta
+					}, { requestKey: null });
+					touchedWallets.add(walletToUpdate);
+				}
+
+				for (const tx of transferTransactions) {
+					await pb.collection('transactions').delete(tx.id, { requestKey: null });
+					deletedTransactions.push(tx);
+				}
+			} catch (error) {
+				const rollbackErrors: string[] = [];
+
+				for (const walletToRestore of touchedWallets) {
+					const snapshot = walletSnapshots.get(walletToRestore);
+					if (!snapshot) continue;
+					try {
+						await pb.collection('wallets').update(walletToRestore, {
+							balance: snapshot.balance
+						}, { requestKey: null });
+					} catch {
+						rollbackErrors.push(`wallet rollback failed: ${walletToRestore}`);
+					}
+				}
+
+				for (const tx of deletedTransactions) {
+					try {
+						await pb.collection('transactions').create({
+							wallet: tx.wallet,
+							category: tx.category,
+							amount: tx.amount,
+							description: tx.description,
+							date: tx.date,
+							recurring: tx.recurring,
+							recur_day: tx.recur_day,
+							recurring_source_id: tx.recurring_source_id,
+							transfer_id: tx.transfer_id
+						}, { requestKey: null });
+					} catch {
+						rollbackErrors.push(`transaction rollback failed: ${tx.id}`);
+					}
+				}
+
+				if (rollbackErrors.length > 0) {
+					throw new Error(
+						`Delete transfer failed and rollback was incomplete (${rollbackErrors.join(', ')}).`
+					);
+				}
+
+				throw error;
+			}
+
+			for (const walletIdToRefresh of walletDeltas.keys()) {
+				getTransactions(walletIdToRefresh).refresh();
+				getWallet(walletIdToRefresh).refresh();
+			}
+
+			return { success: true };
+		}
+
+		await pb.collection('transactions').delete(id, { requestKey: null });
 		await pb.collection('wallets').update(transaction.wallet, {
 			balance: wallet.balance - transaction.amount,
 			...(transaction.amount > 0 && { total_funded: wallet.total_funded - transaction.amount })

@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { getWallet, deleteWallet, recalculateBalance, updatePeriodPrefs } from '$lib/wallets.remote';
+	import { getWallet, getWallets, deleteWallet, archiveWallet, unarchiveWallet, recalculateBalance, updatePeriodPrefs, updateCategoryColor } from '$lib/wallets.remote';
 	import {
 		getTransactions,
 		getTransactionsPaged,
@@ -17,6 +17,9 @@
 	import Alert from '$lib/components/Alert.svelte';
 	import TransactionList from '$lib/components/TransactionList.svelte';
 	import TransactionForm from '$lib/components/TransactionForm.svelte';
+	import EditTransactionForm from '$lib/components/EditTransactionForm.svelte';
+	import TransferForm from '$lib/components/TransferForm.svelte';
+	import { getStandardPeriodRange } from '$lib/utils/dateRange';
 
 	const BUILTIN_PERIODS: { value: string; label: string }[] = [
 		{ value: 'this-month', label: 'This Month' },
@@ -31,9 +34,13 @@
 	const RESERVED_PERIOD_VALUES = new Set(BUILTIN_PERIODS.map((p) => p.value));
 
 	let showAddTransaction = $state(false);
+	let showTransfer = $state(false);
 	let showDeleteConfirm = $state(false);
+	let deleteConfirmName = $state('');
 	let transactionToDelete = $state<Transaction | null>(null);
+	let transactionToEdit = $state<Transaction | null>(null);
 	let reconciling = $state(false);
+	let archiving = $state(false);
 	let error = $state('');
 
 	const walletId = page.params.id!;
@@ -73,27 +80,9 @@
 	function getDateRange(period: string): { startDate?: string; endDate?: string } {
 		const now = new Date();
 		const pad = (n: number) => String(n).padStart(2, '0');
-		const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
-		if (period === 'this-month') {
-			return { startDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`, endDate: today };
-		}
-		if (period === 'last-month') {
-			const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-			const m = now.getMonth() === 0 ? 12 : now.getMonth();
-			const lastDay = new Date(y, m, 0).getDate();
-			return { startDate: `${y}-${pad(m)}-01`, endDate: `${y}-${pad(m)}-${pad(lastDay)}` };
-		}
-		if (period === 'last-3-months') {
-			const start = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-			return { startDate: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-01`, endDate: today };
-		}
-		if (period === 'this-year') {
-			return { startDate: `${now.getFullYear()}-01-01`, endDate: today };
-		}
-		if (period === 'all-time') {
-			return {};
-		}
+		const standardRange = getStandardPeriodRange(period, now);
+		if (standardRange) return standardRange;
 		if (period === 'pay-cycle') {
 			const day = Math.min(cycleStartDay, 28);
 			const startDate = new Date(now.getFullYear(), now.getMonth() - 1 + cycleOffset, day);
@@ -232,6 +221,10 @@
 		transactionToDelete = transaction;
 	}
 
+	function handleEditTransaction(transaction: Transaction) {
+		transactionToEdit = transaction;
+	}
+
 	async function confirmDeleteTransaction() {
 		if (!transactionToDelete) return;
 		try {
@@ -241,6 +234,29 @@
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to delete transaction';
 			transactionToDelete = null;
+		}
+	}
+
+	async function handleArchiveWallet() {
+		archiving = true;
+		try {
+			await archiveWallet(wallet.id);
+			await goto(resolve('/wallets'));
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to archive wallet';
+		} finally {
+			archiving = false;
+		}
+	}
+
+	async function handleUnarchiveWallet() {
+		archiving = true;
+		try {
+			await unarchiveWallet(wallet.id);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to unarchive wallet';
+		} finally {
+			archiving = false;
 		}
 	}
 
@@ -306,12 +322,9 @@
 </svelte:head>
 
 <AuthGuard>
-	{#snippet children()}
-		<div class="max-w-4xl mx-auto space-y-6">
-			{#if error}
-				<Alert type="error" dismissible ondismiss={() => (error = '')}>
-					{#snippet children()}{error}{/snippet}
-				</Alert>
+	<div class="max-w-4xl mx-auto space-y-6">
+		{#if error}
+			<Alert type="error" dismissible ondismiss={() => (error = '')}>{error}</Alert>
 			{/if}
 
 			<!-- Header -->
@@ -319,7 +332,12 @@
 				<a href={resolve('/wallets')} class="btn btn-ghost btn-sm mb-3 -ml-3">&larr; Wallets</a>
 				<div class="flex justify-between items-end">
 					<div>
-						<h1 class="text-2xl font-bold">{wallet.name}</h1>
+						<div class="flex items-center gap-2">
+							<h1 class="text-2xl font-bold">{wallet.name}</h1>
+							{#if wallet.archived}
+								<span class="badge badge-ghost text-xs">Archived</span>
+							{/if}
+						</div>
 						<div class="flex items-baseline gap-2 mt-1">
 							<p class="text-3xl font-bold text-primary tabular-nums">
 								{formatCurrency(wallet.balance, wallet.currency)}
@@ -338,16 +356,40 @@
 						<Button variant="primary" size="sm" onclick={() => (showAddTransaction = true)}>
 							+ Add
 						</Button>
-						<Button variant="ghost" size="sm" outline onclick={() => (showDeleteConfirm = true)}>
-							Delete
+						<Button variant="ghost" size="sm" onclick={() => (showTransfer = true)}>
+							⇄ Transfer
 						</Button>
+						<div class="dropdown dropdown-end">
+							<button tabindex="0" class="btn btn-ghost btn-sm btn-square" title="Wallet settings">
+								⚙
+							</button>
+							<ul class="dropdown-content menu bg-base-100 rounded-box shadow-lg border border-base-200 w-48 p-1 z-10">
+								{#if wallet.archived}
+									<li>
+										<button onclick={handleUnarchiveWallet} disabled={archiving}>
+											{archiving ? 'Unarchiving…' : 'Unarchive wallet'}
+										</button>
+									</li>
+								{:else}
+									<li>
+										<button onclick={handleArchiveWallet} disabled={archiving}>
+											{archiving ? 'Archiving…' : 'Archive wallet'}
+										</button>
+									</li>
+								{/if}
+								<li>
+									<button class="text-error" onclick={() => (showDeleteConfirm = true)}>
+										Delete wallet
+									</button>
+								</li>
+							</ul>
+						</div>
 					</div>
 				</div>
 			</div>
 
 			<!-- Budget Allocation -->
 			<Card title="Budget Allocation">
-				{#snippet children()}
 					<!-- Period income summary (percentage wallets only) -->
 					{#if wallet.budget_type !== 'fixed'}
 						<div class="flex justify-between items-center mb-5 pb-4 border-b border-base-200">
@@ -372,10 +414,18 @@
 							<div class="space-y-1">
 								<div class="flex items-center justify-between">
 									<div class="flex items-center gap-2">
-										<span
-											class="w-4 h-4 rounded"
+										<label
+											class="w-4 h-4 rounded cursor-pointer shrink-0"
 											style="background-color: {category.color};"
-										></span>
+											title="Change color"
+										>
+											<input
+												type="color"
+												value={category.color}
+												class="sr-only"
+												onchange={(e) => updateCategoryColor({ id: wallet.id, categoryName: category.name, color: e.currentTarget.value })}
+											/>
+										</label>
 										<span class="font-medium">{category.name}</span>
 										{#if wallet.budget_type !== "fixed"}<span class="text-base-content/60">{category.percentage}%</span>{/if}
 										{#if overBudget}
@@ -419,12 +469,10 @@
 							></div>
 						{/each}
 					</div>
-				{/snippet}
 			</Card>
 
 			<!-- Transactions -->
 			<Card title="Transactions">
-				{#snippet children()}
 					<!-- Period selector -->
 					<div class="space-y-2 mb-4">
 						<!-- Built-in periods -->
@@ -593,6 +641,7 @@
 						transactions={pagedResult.items}
 						{wallet}
 						ondelete={handleDeleteTransaction}
+						onedit={handleEditTransaction}
 					/>
 
 					<!-- Pagination -->
@@ -606,36 +655,46 @@
 							</div>
 						</div>
 					{/if}
-				{/snippet}
 			</Card>
 		</div>
 
 		<!-- Add Transaction Modal -->
 		<Modal bind:open={showAddTransaction} title="Add Transaction">
-			{#snippet children()}
-				<TransactionForm
+			<TransactionForm
 					{wallet}
 					onSuccess={() => {
 						showAddTransaction = false;
 						refreshPagedQuery();
 					}}
 				/>
-			{/snippet}
 		</Modal>
 
 		<!-- Delete Wallet Confirmation Modal -->
-		<Modal bind:open={showDeleteConfirm} title="Delete Wallet?">
-			{#snippet children()}
-				<p class="text-base-content/70">
-					Are you sure you want to delete "{wallet.name}"? This action cannot be undone
-					and all transactions will be lost.
+		<Modal
+			bind:open={showDeleteConfirm}
+			title="Delete Wallet?"
+			onclose={() => (deleteConfirmName = '')}
+		>
+				<p class="text-base-content/70 mb-4">
+					This will permanently delete <strong>{wallet.name}</strong> and all its transactions.
+					This cannot be undone.
 				</p>
-			{/snippet}
+				<label class="form-control w-full">
+					<div class="label">
+						<span class="label-text text-sm">Type <strong>{wallet.name}</strong> to confirm</span>
+					</div>
+					<input
+						type="text"
+						class="input input-bordered w-full"
+						placeholder={wallet.name}
+						bind:value={deleteConfirmName}
+					/>
+				</label>
 			{#snippet actions()}
-				<Button variant="ghost" onclick={() => (showDeleteConfirm = false)}>
+				<Button variant="ghost" onclick={() => { showDeleteConfirm = false; deleteConfirmName = ''; }}>
 					Cancel
 				</Button>
-				<Button variant="error" onclick={handleDeleteWallet}>
+				<Button variant="error" onclick={handleDeleteWallet} disabled={deleteConfirmName !== wallet.name}>
 					Delete Wallet
 				</Button>
 			{/snippet}
@@ -647,16 +706,57 @@
 			title="Delete Transaction?"
 			onclose={() => (transactionToDelete = null)}
 		>
-			{#snippet children()}
-				<p class="text-base-content/70">
-					Are you sure you want to delete this transaction? This will reverse its effect on your
-					wallet balance.
-				</p>
-			{/snippet}
+				{#if transactionToDelete?.transfer_id}
+					<p class="text-base-content/70">
+						This is a <strong>transfer</strong>. Deleting it will also delete the linked transaction
+						in the other wallet and reverse the balance changes on both sides.
+					</p>
+				{:else}
+					<p class="text-base-content/70">
+						Are you sure you want to delete this transaction? This will reverse its effect on your
+						wallet balance.
+					</p>
+				{/if}
 			{#snippet actions()}
 				<Button variant="ghost" onclick={() => (transactionToDelete = null)}>Cancel</Button>
 				<Button variant="error" onclick={confirmDeleteTransaction}>Delete Transaction</Button>
 			{/snippet}
 		</Modal>
-	{/snippet}
+		<!-- Transfer Modal -->
+		<Modal bind:open={showTransfer} title="Transfer Between Wallets">
+			<svelte:boundary>
+				{@const allWallets = await getWallets()}
+				<TransferForm
+					sourceWallet={wallet}
+					wallets={allWallets}
+					onSuccess={() => {
+						showTransfer = false;
+						refreshPagedQuery();
+					}}
+					onCancel={() => (showTransfer = false)}
+				/>
+				{#snippet pending()}
+					<span class="loading loading-spinner"></span>
+				{/snippet}
+			</svelte:boundary>
+		</Modal>
+
+		<!-- Edit Transaction Modal -->
+		<Modal
+			open={!!transactionToEdit}
+			title="Edit Transaction"
+			onclose={() => (transactionToEdit = null)}
+		>
+				{#if transactionToEdit}
+					<EditTransactionForm
+						transaction={transactionToEdit}
+						{wallet}
+						onSuccess={() => {
+							transactionToEdit = null;
+							refreshPagedQuery();
+						}}
+						onCancel={() => (transactionToEdit = null)}
+					/>
+				{/if}
+		</Modal>
 </AuthGuard>
