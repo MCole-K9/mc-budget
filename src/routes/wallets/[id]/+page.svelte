@@ -19,7 +19,7 @@
 	import TransactionForm from '$lib/components/TransactionForm.svelte';
 	import EditTransactionForm from '$lib/components/EditTransactionForm.svelte';
 	import TransferForm from '$lib/components/TransferForm.svelte';
-	import { getStandardPeriodRange } from '$lib/utils/dateRange';
+	import { getStandardPeriodRange, getPayCycleRange, getPayCycleOffsetForDate } from '$lib/utils/dateRange';
 
 	const BUILTIN_PERIODS: { value: string; label: string }[] = [
 		{ value: 'this-month', label: 'This Month' },
@@ -79,18 +79,11 @@
 	// When selecting a saved period, setPeriod() copies its dates into customStartDate/customEndDate.
 	function getDateRange(period: string): { startDate?: string; endDate?: string } {
 		const now = new Date();
-		const pad = (n: number) => String(n).padStart(2, '0');
 
 		const standardRange = getStandardPeriodRange(period, now);
 		if (standardRange) return standardRange;
 		if (period === 'pay-cycle') {
-			const day = Math.min(cycleStartDay, 28);
-			const startDate = new Date(now.getFullYear(), now.getMonth() - 1 + cycleOffset, day);
-			const endDate = new Date(now.getFullYear(), now.getMonth() + cycleOffset, day);
-			return {
-				startDate: `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`,
-				endDate: `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}`
-			};
+			return getPayCycleRange(cycleStartDay, cycleOffset, now);
 		}
 		// 'custom' or any saved period name — dates are in customStartDate/customEndDate
 		return {
@@ -196,17 +189,7 @@
 
 	function jumpToCycleForDate(dateStr: string) {
 		if (!dateStr) return;
-		const d = new Date(dateStr + 'T00:00:00');
-		const now = new Date();
-		const day = Math.min(cycleStartDay, 28);
-		// Cycle ends in d's month if d.date < day, otherwise in d's month + 1
-		let endMonth = d.getMonth();
-		let endYear = d.getFullYear();
-		if (d.getDate() >= day) {
-			endMonth++;
-			if (endMonth > 11) { endMonth = 0; endYear++; }
-		}
-		cycleOffset = (endYear - now.getFullYear()) * 12 + (endMonth - now.getMonth());
+		cycleOffset = getPayCycleOffsetForDate(new Date(dateStr + 'T00:00:00'), cycleStartDay);
 		currentPage = 1;
 	}
 

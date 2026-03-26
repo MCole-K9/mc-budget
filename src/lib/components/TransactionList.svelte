@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { env } from '$env/dynamic/public';
 	import type { Transaction, Wallet } from '$lib/types/budget';
+	import { formatLongDate } from '$lib/utils/dateRange';
 
 	interface Props {
 		transactions: Transaction[];
@@ -18,17 +19,7 @@
 		}).format(Math.abs(amount));
 	}
 
-	function formatDate(dateStr: string): string {
-		const datePart = dateStr.split('T')[0].split(' ')[0];
-		const d = new Date(datePart + 'T00:00:00');
-		const now = new Date();
-		return d.toLocaleDateString('en-US', {
-			weekday: 'long',
-			month: 'long',
-			day: 'numeric',
-			...(d.getFullYear() !== now.getFullYear() && { year: 'numeric' })
-		});
-	}
+	const formatDate = formatLongDate;
 
 	function getCategoryColor(transaction: Transaction): string {
 		if (transaction.amount > 0) return '#22c55e';

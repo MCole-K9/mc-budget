@@ -3,6 +3,7 @@
 	import { transferBetweenWallets } from '$lib/transfers.remote';
 	import type { Wallet } from '$lib/types/budget';
 	import Select from './Select.svelte';
+	import { todayYmd } from '$lib/utils/dateRange';
 	import Input from './Input.svelte';
 	import Button from './Button.svelte';
 
@@ -18,11 +19,7 @@
 	const destWallets = $derived(wallets.filter((w) => w.id !== sourceWallet.id));
 	const destOptions = $derived(destWallets.map((w) => ({ value: w.id, label: w.name })));
 	const notifySuccess = () => onSuccess?.();
-	const todayLocal = (() => {
-		const d = new Date();
-		const pad = (n: number) => String(n).padStart(2, '0');
-		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-	})();
+	const todayLocal = todayYmd();
 
 	let lastResultId = untrack(() => transferBetweenWallets.result?.debit?.id ?? '');
 

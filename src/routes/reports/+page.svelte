@@ -3,7 +3,7 @@
 	import { getWallets, getWallet } from '$lib/wallets.remote';
 	import { getReport } from '$lib/transactions.remote';
 	import { getFinancialSettings, getExchangeRates } from '$lib/settings.remote';
-	import { getStandardPeriodRange } from '$lib/utils/dateRange';
+	import { getStandardPeriodRange, formatShortDate, formatMonthLabel } from '$lib/utils/dateRange';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import ChartCanvas from '$lib/components/ChartCanvas.svelte';
 	import type { ChartConfiguration } from 'chart.js';
@@ -64,10 +64,7 @@
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(amount);
 	}
 
-	function formatDate(dateStr: string): string {
-		const d = new Date(dateStr + 'T00:00:00');
-		return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-	}
+	const formatDate = formatShortDate;
 
 	// ── Donut chart: spending by category ─────────────────────────────────────
 	const donutConfig = $derived<ChartConfiguration<'doughnut'>>({
@@ -115,9 +112,7 @@
 				return report.byMonth[month]?.[primaryCurrency]?.[field] ?? 0;
 			};
 			return {
-				labels: months.map(m =>
-					new Date(m + '-02').toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-				),
+				labels: months.map(formatMonthLabel),
 				datasets: [
 					{
 						label: 'Income',

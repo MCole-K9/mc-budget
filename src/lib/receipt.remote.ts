@@ -6,6 +6,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { PROVIDER_MODELS } from '$lib/settings';
+import { todayYmd } from '$lib/utils/dateRange';
 import { getAiKey, getAiProvider } from '$lib/server/settings';
 import { getUserSetting } from '$lib/server/userSettings';
 import { getPb } from '$lib/server/db';
@@ -95,7 +96,7 @@ export const scanReceipt = command(ScanReceiptInputSchema, async (input) => {
 		}
 	}
 
-	const today = new Date().toISOString().split('T')[0];
+	const today = todayYmd();
 
 	const { output } = await generateText({
 		model,

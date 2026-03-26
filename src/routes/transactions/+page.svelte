@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { getAllTransactionsPaged, getAllTransactionsSummary } from '$lib/transactions.remote';
-	import { getStandardPeriodRange } from '$lib/utils/dateRange';
+	import { getStandardPeriodRange, formatLongDate } from '$lib/utils/dateRange';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 
 	const PERIODS: { value: string; label: string }[] = [
@@ -52,17 +52,7 @@
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(amount);
 	}
 
-	function formatDate(dateStr: string): string {
-		const datePart = dateStr.split('T')[0].split(' ')[0];
-		const d = new Date(datePart + 'T00:00:00');
-		const now = new Date();
-		return d.toLocaleDateString('en-US', {
-			weekday: 'long',
-			month: 'long',
-			day: 'numeric',
-			...(d.getFullYear() !== now.getFullYear() && { year: 'numeric' })
-		});
-	}
+	const formatDate = formatLongDate;
 </script>
 
 <svelte:head>

@@ -7,6 +7,7 @@
 	import Card from '$lib/components/Card.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { formatRelativeDate } from '$lib/utils/dateRange';
 
 	const [wallets, recent] = $derived(
 		auth.isAuthenticated
@@ -47,20 +48,7 @@
 		);
 	}
 
-	function formatDate(dateStr: string): string {
-		const d = new Date(dateStr.split('T')[0] + 'T00:00:00');
-		const now = new Date();
-		const yesterday = new Date(now);
-		yesterday.setDate(now.getDate() - 1);
-		if (d.toDateString() === now.toDateString()) return 'Today';
-		if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-		return d.toLocaleDateString('en-US', {
-			weekday: 'long',
-			month: 'long',
-			day: 'numeric',
-			...(d.getFullYear() !== now.getFullYear() && { year: 'numeric' })
-		});
-	}
+	const formatDate = formatRelativeDate;
 </script>
 
 <svelte:head>

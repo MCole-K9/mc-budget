@@ -3,6 +3,7 @@
 	import { createTransaction } from '$lib/transactions.remote';
 	import { scanReceipt } from '$lib/receipt.remote';
 	import type { Wallet } from '$lib/types/budget';
+	import { todayYmd } from '$lib/utils/dateRange';
 	import Select from './Select.svelte';
 	import Input from './Input.svelte';
 	import Button from './Button.svelte';
@@ -18,11 +19,7 @@
 	let isRecurring = $state(false);
 	let recurDay = $state(1);
 	let lastResultId = $state(createTransaction.result?.id ?? '');
-	const todayLocal = (() => {
-		const d = new Date();
-		const pad = (n: number) => String(n).padStart(2, '0');
-		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-	})();
+	const todayLocal = todayYmd();
 
 	// Pre-fillable form state
 	let amount = $state<number | ''>('');
