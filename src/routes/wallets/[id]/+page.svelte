@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { getWallet, getWallets, deleteWallet, archiveWallet, unarchiveWallet, recalculateBalance, updatePeriodPrefs, updateCategoryColor } from '$lib/wallets.remote';
+	import { getWallet, getWallets, deleteWallet, archiveWallet, unarchiveWallet, recalculateBalance, updateWalletPrefs, updateCategoryColor } from '$lib/wallets.remote';
 	import {
 		getTransactions,
 		getTransactionsPaged,
@@ -153,14 +153,22 @@
 		URL.revokeObjectURL(url);
 	}
 
-	async function persistPeriodPrefs(patch: { default_period?: string; saved_periods?: SavedPeriod[]; cycle_start_day?: number }) {
+	async function persistWalletPrefs(patch: { default_period?: string; saved_periods?: SavedPeriod[]; cycle_start_day?: number }) {
 		savingPrefs = true;
 		try {
-			await updatePeriodPrefs({ id: walletId, ...patch });
+			await updateWalletPrefs({ id: walletId, ...patch });
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to save period preference';
 		} finally {
 			savingPrefs = false;
+		}
+	}
+
+	async function walletPref(patch: { carry_forward?: boolean }) {
+		try {
+			await updateWalletPrefs({ id: walletId, ...patch });
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to save wallet preference';
 		}
 	}
 
@@ -173,7 +181,7 @@
 		}
 		const existing = wallet.saved_periods.filter((s) => s.name !== name);
 		const updated: SavedPeriod[] = [...existing, { name, startDate: customStartDate, endDate: customEndDate }];
-		await persistPeriodPrefs({ saved_periods: updated });
+		await persistWalletPrefs({ saved_periods: updated });
 		saveRangeName = '';
 		showSaveRangeInput = false;
 		selectedPeriod = name; // highlight the newly saved period
@@ -183,7 +191,7 @@
 		const updated = wallet.saved_periods.filter((s) => s.name !== sp.name);
 		const patch: { saved_periods: SavedPeriod[]; default_period?: string } = { saved_periods: updated };
 		if (wallet.default_period === sp.name) patch.default_period = '';
-		await persistPeriodPrefs(patch);
+		await persistWalletPrefs(patch);
 		if (selectedPeriod === sp.name) setPeriod('this-month');
 	}
 
@@ -197,7 +205,7 @@
 		const day = Math.max(1, Math.min(28, Math.round(cycleStartDayInput)));
 		cycleStartDay = day;
 		cycleStartDayInput = day;
-		await persistPeriodPrefs({ cycle_start_day: day });
+		await persistWalletPrefs({ cycle_start_day: day });
 	}
 
 	function handleDeleteTransaction(transaction: Transaction) {
@@ -294,8 +302,19 @@
 			: summary.income + (inDateRange(wallet.created.split('T')[0]) ? wallet.initial_balance : 0)
 	);
 
-	// Net income available for budget allocation — outgoing transfers reduce the pool, floored at 0.
-	const effectivePeriodIncome = $derived(Math.max(0, periodIncome - summary.transfersOut));
+	// Total expenses charged to categories in the current period.
+	const totalSpentThisPeriod = $derived(
+		Object.values(summary.spendingByCategory).reduce((s, v) => s + v, 0)
+	);
+
+	// Net income available for budget allocation.
+	// carry_forward mode: use current balance re-grossed by period spending (balance = what's left after spending).
+	// Normal mode: period income minus outgoing transfers, floored at 0.
+	const effectivePeriodIncome = $derived(
+		wallet.carry_forward
+			? Math.max(0, wallet.balance + totalSpentThisPeriod)
+			: Math.max(0, periodIncome - summary.transfersOut)
+	);
 
 	// Spending per category for the selected period — from server-aggregated summary
 	function getCategorySpent(categoryName: string): number {
@@ -455,6 +474,18 @@
 							></div>
 						{/each}
 					</div>
+
+					{#if wallet.budget_type !== 'fixed'}
+						<div class="flex items-center justify-between mt-4 pt-4 border-t border-base-200">
+							<span class="text-xs text-base-content/50">Carry forward balance</span>
+							<input
+								type="checkbox"
+								class="toggle toggle-sm"
+								checked={wallet.carry_forward}
+								onchange={(e) => walletPref({ carry_forward: e.currentTarget.checked })}
+							/>
+						</div>
+					{/if}
 			</Card>
 
 			<!-- Transactions -->
@@ -473,7 +504,7 @@
 									</button>
 									<button
 										class="btn btn-ghost btn-xs px-1 opacity-50 hover:opacity-100"
-										onclick={() => persistPeriodPrefs({ default_period: p.value })}
+										onclick={() => persistWalletPrefs({ default_period: p.value })}
 										disabled={savingPrefs}
 										title="{wallet.default_period === p.value ? 'Default period' : 'Set as default'}"
 									>
@@ -502,7 +533,7 @@
 										</button>
 										<button
 											class="btn btn-ghost btn-xs px-1 opacity-50 hover:opacity-100 rounded-none border-0"
-											onclick={() => persistPeriodPrefs({ default_period: sp.name })}
+											onclick={() => persistWalletPrefs({ default_period: sp.name })}
 											disabled={savingPrefs}
 											title="{wallet.default_period === sp.name ? 'Default period' : 'Set as default'}"
 										>

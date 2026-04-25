@@ -88,11 +88,12 @@ export const SavedPeriodSchema = z.object({
 export type SavedPeriod = z.infer<typeof SavedPeriodSchema>;
 
 // Update period preferences input
-export const UpdatePeriodPrefsInputSchema = z.object({
+export const UpdateWalletPrefsInputSchema = z.object({
 	id: z.string().min(1),
 	default_period: z.string().optional(),
 	saved_periods: z.array(SavedPeriodSchema).optional(),
-	cycle_start_day: z.number().int().min(1).max(28).optional()
+	cycle_start_day: z.number().int().min(1).max(28).optional(),
+	carry_forward: z.boolean().optional()
 });
 
 // Wallet Schema (from database)
@@ -110,6 +111,7 @@ export const WalletSchema = z.object({
 	cycle_start_day: z.number().catch(1),
 	budget_type: z.enum(['percentage', 'fixed']).catch('percentage'),
 	archived: z.boolean().catch(false),
+	carry_forward: z.boolean().catch(false),
 	created: z.string(),
 	updated: z.string()
 });
