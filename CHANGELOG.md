@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/MCole-K9/mc-budget/compare/v1.1.0...v1.2.0) (2026-03-26)
+
+
+### Features
+
+* refactor date handling by introducing utility functions for date formatting and retrieval ([8cb0df9](https://github.com/MCole-K9/mc-budget/commit/8cb0df9b2390487d4ea061811b25ac1189a2e040))
+
 ## [1.1.0](https://github.com/MCole-K9/mc-budget/compare/v1.0.1...v1.1.0) (2026-03-25)
 
 
