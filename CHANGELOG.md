@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/MCole-K9/mc-budget/compare/v1.2.0...v1.3.0) (2026-04-25)
+
+
+### Features
+
+* enhance transaction handling by updating total_funded during transfers and recalculations ([c6949d2](https://github.com/MCole-K9/mc-budget/commit/c6949d2e17a62be03d0140485c0283970baa28a5))
+
 ## [1.2.0](https://github.com/MCole-K9/mc-budget/compare/v1.1.0...v1.2.0) (2026-03-26)
 
 
