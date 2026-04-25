@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/MCole-K9/mc-budget/compare/v1.3.0...v1.4.0) (2026-04-25)
+
+
+### Features
+
+* add carry forward functionality to wallet preferences and update related schemas ([ff9a3a2](https://github.com/MCole-K9/mc-budget/commit/ff9a3a2f62edd5862aafe9911e44ed02f9e7dd79))
+* update transaction summary to include transfers out and adjust income calculations ([3c19453](https://github.com/MCole-K9/mc-budget/commit/3c19453a93044d1ce6bc47225ac31e24ffceca9a))
+
 ## [1.3.0](https://github.com/MCole-K9/mc-budget/compare/v1.2.0...v1.3.0) (2026-04-25)
 
 
