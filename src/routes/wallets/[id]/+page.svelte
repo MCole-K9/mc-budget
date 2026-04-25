@@ -272,7 +272,7 @@
 		if (wallet.budget_type === "fixed") {
 			return category.fixedAmount ?? 0;
 		}
-		return (periodIncome * category.percentage) / 100;
+		return (effectivePeriodIncome * category.percentage) / 100;
 	}
 
 	function inDateRange(date: string): boolean {
@@ -285,14 +285,17 @@
 		BUILTIN_PERIODS.find((p) => p.value === selectedPeriod)?.label ?? selectedPeriod
 	);
 
-	// Income received in the selected period.
-	// For 'all-time' use total_funded (which includes initial_balance + all income).
+	// Gross income for the selected period (before deducting transfers out).
+	// For 'all-time' use total_funded (initial_balance + all income + incoming transfers).
 	// For other periods: server-aggregated income + initial_balance if wallet was created in range.
 	const periodIncome = $derived(
 		selectedPeriod === 'all-time'
 			? wallet.total_funded
 			: summary.income + (inDateRange(wallet.created.split('T')[0]) ? wallet.initial_balance : 0)
 	);
+
+	// Net income available for budget allocation — outgoing transfers reduce the pool, floored at 0.
+	const effectivePeriodIncome = $derived(Math.max(0, periodIncome - summary.transfersOut));
 
 	// Spending per category for the selected period — from server-aggregated summary
 	function getCategorySpent(categoryName: string): number {
@@ -377,9 +380,9 @@
 					{#if wallet.budget_type !== 'fixed'}
 						<div class="flex justify-between items-center mb-5 pb-4 border-b border-base-200">
 							<span class="text-xs font-medium text-base-content/40 uppercase tracking-wider">Income · {periodLabel}</span>
-							<span class="text-sm font-semibold">{formatCurrency(periodIncome, wallet.currency)}</span>
+							<span class="text-sm font-semibold">{formatCurrency(effectivePeriodIncome, wallet.currency)}</span>
 						</div>
-						{#if periodIncome === 0 && selectedPeriod !== 'all-time'}
+						{#if effectivePeriodIncome === 0 && selectedPeriod !== 'all-time'}
 							<div class="text-xs text-base-content/40 text-center py-2">
 								No income this period. Switch to All Time to see full allocation.
 							</div>

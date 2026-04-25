@@ -33,12 +33,14 @@ export const getTransactionSummary = query(GetTransactionSummarySchema, async (i
 	});
 
 	let income = 0;
+	let transfersOut = 0;
 	const spendingByCategory: Record<string, number> = {};
 
 	for (const r of records) {
 		const amount = Number(r.amount) || 0;
 		if (r.transfer_id) {
 			if (amount > 0) income += amount;
+			else transfersOut += Math.abs(amount);
 			continue;
 		}
 		if (amount > 0) {
@@ -49,7 +51,7 @@ export const getTransactionSummary = query(GetTransactionSummarySchema, async (i
 		}
 	}
 
-	return { income, spendingByCategory };
+	return { income, transfersOut, spendingByCategory };
 });
 
 const GetTransactionsPagedSchema = z.object({
