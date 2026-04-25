@@ -73,7 +73,8 @@ export const transferBetweenWallets = form(TransferFormSchema, async (input) => 
 		sourceWalletUpdated = true;
 
 		await pb.collection('wallets').update(input.destWalletId, {
-			balance: destWallet.balance + creditAmount
+			balance: destWallet.balance + creditAmount,
+			total_funded: destWallet.total_funded + creditAmount
 		}, { requestKey: null });
 		destWalletUpdated = true;
 	} catch (error) {

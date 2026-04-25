@@ -36,8 +36,11 @@ export const getTransactionSummary = query(GetTransactionSummarySchema, async (i
 	const spendingByCategory: Record<string, number> = {};
 
 	for (const r of records) {
-		if (r.transfer_id) continue;
 		const amount = Number(r.amount) || 0;
+		if (r.transfer_id) {
+			if (amount > 0) income += amount;
+			continue;
+		}
 		if (amount > 0) {
 			income += amount;
 		} else {
@@ -424,12 +427,22 @@ export const deleteTransaction = command(
 
 			const walletDeltas = computeTransferDeleteDeltas(transferTransactions);
 
+			// For each wallet, compute how much to reverse from total_funded (positive credits)
+			const totalFundedDeltas = new Map<string, number>();
+			for (const tx of transferTransactions) {
+				if (tx.amount > 0) {
+					totalFundedDeltas.set(tx.wallet, (totalFundedDeltas.get(tx.wallet) ?? 0) - tx.amount);
+				}
+			}
+
 			try {
 				for (const [walletToUpdate, balanceDelta] of walletDeltas) {
 					const snapshot = walletSnapshots.get(walletToUpdate);
 					if (!snapshot) throw new Error('Missing wallet snapshot during transfer delete');
+					const totalFundedDelta = totalFundedDeltas.get(walletToUpdate);
 					await pb.collection('wallets').update(walletToUpdate, {
-						balance: snapshot.balance + balanceDelta
+						balance: snapshot.balance + balanceDelta,
+						...(totalFundedDelta !== undefined && { total_funded: snapshot.total_funded + totalFundedDelta })
 					}, { requestKey: null });
 					touchedWallets.add(walletToUpdate);
 				}
@@ -446,7 +459,8 @@ export const deleteTransaction = command(
 					if (!snapshot) continue;
 					try {
 						await pb.collection('wallets').update(walletToRestore, {
-							balance: snapshot.balance
+							balance: snapshot.balance,
+							total_funded: snapshot.total_funded
 						}, { requestKey: null });
 					} catch {
 						rollbackErrors.push(`wallet rollback failed: ${walletToRestore}`);
