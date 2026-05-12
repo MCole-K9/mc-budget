@@ -22,8 +22,15 @@
 	let date = $state(untrack(() => transaction.date.split('T')[0].split(' ')[0]));
 	let selectedCategory = $state(untrack(() => isInitiallyExpense ? transaction.category : ''));
 	let incomeSource = $state(untrack(() => !isInitiallyExpense ? transaction.category : ''));
+	let isRecurring = $state(untrack(() => transaction.recurring));
+	let recurDay = $state(untrack(() => transaction.recur_day || 1));
 	let submitting = $state(false);
 	let error = $state('');
+
+	const dayOptions = Array.from({ length: 28 }, (_, i) => ({
+		value: String(i + 1),
+		label: String(i + 1)
+	}));
 
 	const categoryOptions = $derived(
 		wallet.categories.map((c) => ({ value: c.name, label: c.name }))
@@ -46,7 +53,9 @@
 				incomeSource: !isExpense ? incomeSource : undefined,
 				amount: Number(amount),
 				description: description || undefined,
-				date
+				date,
+				recurring: isRecurring,
+				recur_day: isRecurring ? recurDay : undefined
 			});
 			onSuccess?.();
 		} catch (err) {
@@ -123,6 +132,30 @@
 		required
 		bind:value={date}
 	/>
+
+	<!-- Recurring -->
+	<div class="space-y-2">
+		<label class="flex items-center gap-3 cursor-pointer">
+			<input type="checkbox" class="checkbox checkbox-sm" bind:checked={isRecurring} />
+			<span class="label-text">Repeat monthly</span>
+		</label>
+
+		{#if isRecurring}
+			<div class="flex items-center gap-2 pl-7">
+				<span class="text-sm text-base-content/70">on day</span>
+				<select
+					class="select select-bordered select-sm w-20"
+					value={String(recurDay)}
+					onchange={(e) => (recurDay = Number(e.currentTarget.value))}
+				>
+					{#each dayOptions as opt (opt.value)}
+						<option value={opt.value}>{opt.label}</option>
+					{/each}
+				</select>
+				<span class="text-sm text-base-content/70">of each month</span>
+			</div>
+		{/if}
+	</div>
 
 	<div class="flex gap-2">
 		{#if onCancel}
