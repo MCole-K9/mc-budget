@@ -337,6 +337,20 @@ export const createTransaction = form(CreateTransactionFormSchema, async (input)
 		...(finalAmount > 0 && { total_funded: wallet.total_funded + finalAmount })
 	});
 
+	if (isRecurring) {
+		const schedule = await pb.collection('recurring_schedules').create({
+			wallet: input.walletId,
+			category: finalCategory,
+			description: input.description?.trim() || '',
+			amount: finalAmount,
+			recur_day: recurDay,
+			active: true
+		}, { requestKey: null });
+		await pb.collection('transactions').update(record.id, {
+			recurring_source_id: schedule.id
+		}, { requestKey: null });
+	}
+
 	getTransactions(input.walletId).refresh();
 	getWallet(input.walletId).refresh();
 
@@ -392,70 +406,6 @@ export const updateTransaction = command(UpdateTransactionInputSchema, async (in
 		await pb.collection('transactions').getOne(input.id, { requestKey: null })
 	);
 });
-
-export const getRecurringTransactions = query(async () => {
-	const records = await getPb().collection('transactions').getFullList({
-		filter: 'recurring = true',
-		sort: 'wallet,recur_day',
-		expand: 'wallet',
-		requestKey: null
-	});
-
-	return records.map((r) => {
-		const tx = TransactionSchema.parse(r);
-		const w = r.expand?.['wallet'] as Record<string, unknown> | undefined;
-		const cats = Array.isArray(w?.categories)
-			? (w.categories as { name: string; color: string }[])
-			: [];
-		const catColor = cats.find((c) => c.name.toLowerCase() === tx.category.toLowerCase())?.color ?? null;
-		return {
-			...tx,
-			walletName: String(w?.name ?? ''),
-			currency: String(w?.currency ?? 'USD'),
-			categoryColor: catColor
-		};
-	});
-});
-
-export const updateRecurringSettings = command(
-	z.object({
-		id: z.string().min(1),
-		walletId: z.string().min(1),
-		recurring: z.boolean(),
-		recur_day: z.number().min(1).max(28).optional(),
-		amount: z.number().gt(0).optional()
-	}),
-	async (input) => {
-		const pb = getPb();
-		const existing = TransactionSchema.parse(
-			await pb.collection('transactions').getOne(input.id, { requestKey: null })
-		);
-		if (existing.wallet !== input.walletId) {
-			throw new Error('Transaction does not belong to the specified wallet');
-		}
-
-		const recurDay = input.recurring ? Math.min(28, Math.max(1, input.recur_day ?? 1)) : 0;
-		const patch: Record<string, unknown> = { recurring: input.recurring, recur_day: recurDay };
-
-		if (input.amount !== undefined) {
-			// Preserve the sign (expense stays negative, income stays positive)
-			const finalAmount = existing.amount < 0 ? -Math.abs(input.amount) : Math.abs(input.amount);
-			patch.amount = finalAmount;
-
-			const wallet = WalletSchema.parse(
-				await pb.collection('wallets').getOne(input.walletId, { requestKey: null })
-			);
-			const walletPatch = computeWalletPatch(existing.amount, finalAmount, wallet.balance, wallet.total_funded);
-			await pb.collection('wallets').update(input.walletId, walletPatch);
-			getWallet(input.walletId).refresh();
-		}
-
-		await pb.collection('transactions').update(input.id, patch);
-
-		getRecurringTransactions().refresh();
-		getTransactions(input.walletId).refresh();
-	}
-);
 
 export const deleteTransaction = command(
 	z.object({ id: z.string(), walletId: z.string() }),

@@ -147,6 +147,20 @@ export const BudgetPresetSchema = z.object({
 
 export type BudgetPreset = z.infer<typeof BudgetPresetSchema>;
 
+// Recurring Schedule Schema
+export const RecurringScheduleSchema = z.object({
+	id: z.string(),
+	wallet: z.string(),
+	category: z.string(),
+	description: z.string().catch(''),
+	amount: z.number(),
+	recur_day: z.number(),
+	active: z.boolean().catch(true),
+	created: z.string()
+});
+
+export type RecurringSchedule = z.infer<typeof RecurringScheduleSchema>;
+
 // User Schema (matches PocketBase auth record)
 export const UserSchema = z.object({
 	id: z.string(),

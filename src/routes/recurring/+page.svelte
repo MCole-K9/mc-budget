@@ -1,20 +1,20 @@
 <script lang="ts">
-	import { getRecurringTransactions, updateRecurringSettings } from '$lib/transactions.remote';
+	import { getRecurringSchedules, updateRecurringSchedule, removeRecurringSchedule } from '$lib/recurring.remote';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import { resolve } from '$app/paths';
 
-	const recurringList = $derived(await getRecurringTransactions());
+	const scheduleList = $derived(await getRecurringSchedules());
 
-	type RecurringTx = Awaited<ReturnType<typeof getRecurringTransactions>>[number];
+	type Schedule = Awaited<ReturnType<typeof getRecurringSchedules>>[number];
 
 	const grouped = $derived(
-		recurringList.reduce<{ walletId: string; walletName: string; currency: string; items: RecurringTx[] }[]>(
-			(acc, tx) => {
+		scheduleList.reduce<{ walletId: string; walletName: string; currency: string; items: Schedule[] }[]>(
+			(acc, s) => {
 				const last = acc[acc.length - 1];
-				if (last?.walletId === tx.wallet) last.items.push(tx);
-				else acc.push({ walletId: tx.wallet, walletName: tx.walletName, currency: tx.currency, items: [tx] });
+				if (last?.walletId === s.wallet) last.items.push(s);
+				else acc.push({ walletId: s.wallet, walletName: s.walletName, currency: s.currency, items: [s] });
 				return acc;
 			},
 			[]
@@ -32,7 +32,7 @@
 
 	let savingId = $state('');
 	let error = $state('');
-	let txToConfirmRemove = $state<RecurringTx | null>(null);
+	let scheduleToRemove = $state<Schedule | null>(null);
 	let editingAmountId = $state('');
 	let editingAmountValue = $state('');
 
@@ -40,11 +40,11 @@
 		node.focus();
 	}
 
-	async function changeDay(tx: RecurringTx, day: number) {
-		savingId = tx.id;
+	async function toggleActive(schedule: Schedule) {
+		savingId = schedule.id;
 		error = '';
 		try {
-			await updateRecurringSettings({ id: tx.id, walletId: tx.wallet, recurring: true, recur_day: day });
+			await updateRecurringSchedule({ id: schedule.id, active: !schedule.active });
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to update';
 		} finally {
@@ -52,20 +52,26 @@
 		}
 	}
 
-	async function saveAmount(tx: RecurringTx, raw: string) {
+	async function changeDay(schedule: Schedule, day: number) {
+		savingId = schedule.id;
+		error = '';
+		try {
+			await updateRecurringSchedule({ id: schedule.id, recur_day: day });
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to update';
+		} finally {
+			savingId = '';
+		}
+	}
+
+	async function saveAmount(schedule: Schedule, raw: string) {
 		editingAmountId = '';
 		const value = parseFloat(raw);
-		if (!value || value <= 0 || value === Math.abs(tx.amount)) return;
-		savingId = tx.id;
+		if (!value || value <= 0 || value === Math.abs(schedule.amount)) return;
+		savingId = schedule.id;
 		error = '';
 		try {
-			await updateRecurringSettings({
-				id: tx.id,
-				walletId: tx.wallet,
-				recurring: true,
-				recur_day: tx.recur_day || 1,
-				amount: value
-			});
+			await updateRecurringSchedule({ id: schedule.id, amount: value });
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to update';
 		} finally {
@@ -73,16 +79,16 @@
 		}
 	}
 
-	async function confirmRemoveRecurrence() {
-		if (!txToConfirmRemove) return;
-		const tx = txToConfirmRemove;
-		txToConfirmRemove = null;
-		savingId = tx.id;
+	async function confirmRemove() {
+		if (!scheduleToRemove) return;
+		const s = scheduleToRemove;
+		scheduleToRemove = null;
+		savingId = s.id;
 		error = '';
 		try {
-			await updateRecurringSettings({ id: tx.id, walletId: tx.wallet, recurring: false });
+			await removeRecurringSchedule({ id: s.id });
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to update';
+			error = err instanceof Error ? err.message : 'Failed to remove';
 		} finally {
 			savingId = '';
 		}
@@ -97,7 +103,7 @@
 	<div class="max-w-2xl mx-auto space-y-6">
 		<div>
 			<h1 class="text-2xl font-bold">Recurring Transactions</h1>
-			<p class="text-sm text-base-content/50 mt-1">Transactions that repeat monthly. Click an amount to edit it.</p>
+			<p class="text-sm text-base-content/50 mt-1">Monthly schedules. Click an amount to change what future recurrences will use.</p>
 		</div>
 
 		{#if error}
@@ -107,7 +113,7 @@
 		{#if grouped.length === 0}
 			<div class="bg-base-100 rounded-2xl shadow-sm p-12 text-center">
 				<p class="text-base-content/40 text-sm">No recurring transactions yet.</p>
-				<p class="text-base-content/30 text-xs mt-1">Mark a transaction as "Repeat monthly" when creating or editing it.</p>
+				<p class="text-base-content/30 text-xs mt-1">Mark a transaction as "Repeat monthly" when creating it.</p>
 			</div>
 		{:else}
 			{#each grouped as group (group.walletId)}
@@ -124,33 +130,33 @@
 
 					<div class="bg-base-100 rounded-2xl shadow-sm overflow-hidden">
 						<div class="divide-y divide-base-200">
-							{#each group.items as tx (tx.id)}
-								{@const saving = savingId === tx.id}
-								{@const editingAmount = editingAmountId === tx.id}
-								<div class="flex items-center gap-3 px-4 py-3">
+							{#each group.items as schedule (schedule.id)}
+								{@const saving = savingId === schedule.id}
+								{@const editingAmount = editingAmountId === schedule.id}
+								<div class="flex items-center gap-3 px-4 py-3 {!schedule.active ? 'opacity-40' : ''}">
 									<span
 										class="w-2.5 h-2.5 rounded-full shrink-0"
-										style="background-color: {tx.categoryColor ?? (tx.amount > 0 ? '#22c55e' : '#9ca3af')};"
+										style="background-color: {schedule.categoryColor ?? (schedule.amount > 0 ? '#22c55e' : '#9ca3af')};"
 									></span>
 
 									<div class="flex-1 min-w-0">
 										<p class="font-medium text-sm leading-snug truncate">
-											{tx.description || tx.category}
+											{schedule.description || schedule.category}
 										</p>
-										<p class="text-xs text-base-content/40 truncate">{tx.category}</p>
+										<p class="text-xs text-base-content/40 truncate">{schedule.category}</p>
 									</div>
 
-									<!-- Editable amount -->
+									<!-- Editable amount (changes schedule only, not past transactions) -->
 									{#if editingAmount}
 										<input
+											use:focusOnMount
 											type="number"
 											class="input input-bordered input-xs w-24 text-right tabular-nums"
 											value={editingAmountValue}
 											min="0.01"
 											step="0.01"
-											use:focusOnMount
 											oninput={(e) => (editingAmountValue = e.currentTarget.value)}
-											onblur={() => saveAmount(tx, editingAmountValue)}
+											onblur={() => saveAmount(schedule, editingAmountValue)}
 											onkeydown={(e) => {
 												if (e.key === 'Enter') e.currentTarget.blur();
 												if (e.key === 'Escape') editingAmountId = '';
@@ -158,15 +164,15 @@
 										/>
 									{:else}
 										<button
-											class="font-semibold text-sm shrink-0 tabular-nums {tx.amount < 0 ? 'text-error' : 'text-success'} hover:opacity-60 transition-opacity"
-											title="Click to edit amount"
+											class="font-semibold text-sm shrink-0 tabular-nums {schedule.amount < 0 ? 'text-error' : 'text-success'} hover:opacity-60 transition-opacity"
+											title="Click to change future amount"
 											disabled={saving}
 											onclick={() => {
-												editingAmountId = tx.id;
-												editingAmountValue = String(Math.abs(tx.amount));
+												editingAmountId = schedule.id;
+												editingAmountValue = String(Math.abs(schedule.amount));
 											}}
 										>
-											{tx.amount < 0 ? '−' : '+'}{formatCurrency(Math.abs(tx.amount), group.currency)}
+											{schedule.amount < 0 ? '−' : '+'}{formatCurrency(Math.abs(schedule.amount), group.currency)}
 										</button>
 									{/if}
 
@@ -175,9 +181,9 @@
 										<span class="text-xs text-base-content/40">day</span>
 										<select
 											class="select select-bordered select-xs w-16"
-											value={String(tx.recur_day || 1)}
+											value={String(schedule.recur_day || 1)}
 											disabled={saving}
-											onchange={(e) => changeDay(tx, Number(e.currentTarget.value))}
+											onchange={(e) => changeDay(schedule, Number(e.currentTarget.value))}
 										>
 											{#each dayOptions as opt (opt.value)}
 												<option value={opt.value}>{opt.label}</option>
@@ -185,12 +191,22 @@
 										</select>
 									</div>
 
-									<!-- Remove recurring button -->
+									<!-- Active toggle -->
+									<input
+										type="checkbox"
+										class="toggle toggle-xs toggle-success"
+										checked={schedule.active}
+										disabled={saving}
+										title={schedule.active ? 'Pause schedule' : 'Resume schedule'}
+										onchange={() => toggleActive(schedule)}
+									/>
+
+									<!-- Remove schedule button -->
 									<button
 										class="btn btn-ghost btn-xs text-base-content/30 hover:text-error"
-										title="Remove recurrence"
+										title="Remove recurring schedule"
 										disabled={saving}
-										onclick={() => (txToConfirmRemove = tx)}
+										onclick={() => (scheduleToRemove = schedule)}
 									>
 										{#if saving}
 											<span class="loading loading-spinner loading-xs"></span>
@@ -210,17 +226,17 @@
 	</div>
 
 	<Modal
-		open={!!txToConfirmRemove}
-		title="Remove Recurrence?"
-		onclose={() => (txToConfirmRemove = null)}
+		open={!!scheduleToRemove}
+		title="Remove Recurring Schedule?"
+		onclose={() => (scheduleToRemove = null)}
 	>
 		<p class="text-base-content/70">
-			<strong>{txToConfirmRemove?.description || txToConfirmRemove?.category}</strong> will no longer
-			repeat monthly. The transaction itself will not be deleted.
+			<strong>{scheduleToRemove?.description || scheduleToRemove?.category}</strong> will no longer
+			repeat monthly. Past transactions are not affected.
 		</p>
 		{#snippet actions()}
-			<Button variant="ghost" onclick={() => (txToConfirmRemove = null)}>Cancel</Button>
-			<Button variant="error" onclick={confirmRemoveRecurrence}>Remove Recurrence</Button>
+			<Button variant="ghost" onclick={() => (scheduleToRemove = null)}>Cancel</Button>
+			<Button variant="error" onclick={confirmRemove}>Remove Schedule</Button>
 		{/snippet}
 	</Modal>
 </AuthGuard>
