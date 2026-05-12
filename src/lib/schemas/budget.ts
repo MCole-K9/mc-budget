@@ -194,9 +194,7 @@ export const UpdateTransactionInputSchema = z.object({
 	incomeSource: z.string().optional(),
 	amount: z.number().gt(0, 'Amount must be greater than 0'),
 	description: z.string().optional(),
-	date: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid date format'),
-	recurring: z.boolean().optional(),
-	recur_day: z.number().min(1).max(28).optional()
+	date: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid date format')
 });
 
 // Validate transaction category exists in wallet

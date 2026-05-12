@@ -384,16 +384,11 @@ export const updateTransaction = command(UpdateTransactionInputSchema, async (in
 		}
 	}
 
-	const isRecurring = input.recurring ?? false;
-	const recurDay = isRecurring ? Math.min(28, Math.max(1, input.recur_day ?? 1)) : 0;
-
 	await pb.collection('transactions').update(input.id, {
 		category: finalCategory,
 		amount: finalAmount,
 		description: input.description?.trim() || '',
-		date: input.date,
-		recurring: isRecurring,
-		recur_day: recurDay
+		date: input.date
 	});
 
 	const walletPatch = computeWalletPatch(existing.amount, finalAmount, wallet.balance, wallet.total_funded);

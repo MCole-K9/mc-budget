@@ -56,9 +56,8 @@ export const removeRecurringSchedule = command(
 	z.object({ id: z.string().min(1) }),
 	async ({ id }) => {
 		const pb = getPb();
-		await pb.collection('recurring_schedules').update(id, { active: false }, { requestKey: null });
 
-		// Clear recurring flag on all linked transactions
+		// Clear recurring flag on all linked transactions before deleting
 		const linked = await pb.collection('transactions').getFullList({
 			filter: `recurring_source_id = "${id}"`,
 			requestKey: null
@@ -70,6 +69,7 @@ export const removeRecurringSchedule = command(
 			}, { requestKey: null });
 		}
 
+		await pb.collection('recurring_schedules').delete(id, { requestKey: null });
 		getRecurringSchedules().refresh();
 	}
 );
