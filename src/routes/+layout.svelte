@@ -36,6 +36,7 @@
 				<div class="hidden sm:flex gap-1">
 					<a href={resolve('/wallets')} class="btn btn-ghost btn-sm">Wallets</a>
 					<a href={resolve('/transactions')} class="btn btn-ghost btn-sm">Transactions</a>
+					<a href={resolve('/recurring')} class="btn btn-ghost btn-sm">Recurring</a>
 					<a href={resolve('/reports')} class="btn btn-ghost btn-sm">Reports</a>
 					<a href={resolve('/presets')} class="btn btn-ghost btn-sm">Presets</a>
 				</div>
@@ -56,6 +57,7 @@
 						<!-- Mobile-only nav links -->
 						<li class="sm:hidden"><a href={resolve('/wallets')}>Wallets</a></li>
 						<li class="sm:hidden"><a href={resolve('/transactions')}>Transactions</a></li>
+						<li class="sm:hidden"><a href={resolve('/recurring')}>Recurring</a></li>
 						<li class="sm:hidden"><a href={resolve('/reports')}>Reports</a></li>
 						<li class="sm:hidden"><a href={resolve('/presets')}>Presets</a></li>
 						<li class="sm:hidden divider my-0"></li>

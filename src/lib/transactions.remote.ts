@@ -337,6 +337,20 @@ export const createTransaction = form(CreateTransactionFormSchema, async (input)
 		...(finalAmount > 0 && { total_funded: wallet.total_funded + finalAmount })
 	});
 
+	if (isRecurring) {
+		const schedule = await pb.collection('recurring_schedules').create({
+			wallet: input.walletId,
+			category: finalCategory,
+			description: input.description?.trim() || '',
+			amount: finalAmount,
+			recur_day: recurDay,
+			active: true
+		}, { requestKey: null });
+		await pb.collection('transactions').update(record.id, {
+			recurring_source_id: schedule.id
+		}, { requestKey: null });
+	}
+
 	getTransactions(input.walletId).refresh();
 	getWallet(input.walletId).refresh();
 
