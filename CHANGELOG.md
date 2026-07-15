@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/MCole-K9/mc-budget/compare/v1.4.0...v1.5.0) (2026-07-15)
+
+
+### Features
+
+* Reoccurring trans management ([#13](https://github.com/MCole-K9/mc-budget/issues/13)) ([e454b08](https://github.com/MCole-K9/mc-budget/commit/e454b085684ed772a9cc24dd3922e2fc02596efc))
+
 ## [1.4.0](https://github.com/MCole-K9/mc-budget/compare/v1.3.0...v1.4.0) (2026-04-25)
 
 
