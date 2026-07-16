@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { TransferFormSchema, UpdateTransactionInputSchema, TransactionSchema } from './schemas/budget';
-import { computeWalletPatch, computeTransferDeleteDeltas } from './utils/balance';
+import {
+	computeWalletPatch,
+	computeTransferDeleteDeltas,
+	computeTransactionDeletePatch
+} from './utils/balance';
 
 // ── TransferFormSchema ─────────────────────────────────────────────────────
 
@@ -141,6 +145,13 @@ describe('TransactionSchema transfer_id', () => {
 		const tx = TransactionSchema.parse({ ...base, transfer_id: 'uuid-abc-123' });
 		expect(tx.transfer_id).toBe('uuid-abc-123');
 	});
+
+	it('defaults balance_adjustment to false and parses true when present', () => {
+		expect(TransactionSchema.parse(base).balance_adjustment).toBe(false);
+		expect(
+			TransactionSchema.parse({ ...base, balance_adjustment: true }).balance_adjustment
+		).toBe(true);
+	});
 });
 
 // ── computeTransferDeleteDeltas ────────────────────────────────────────────
@@ -216,5 +227,24 @@ describe('computeWalletPatch', () => {
 		const patch = computeWalletPatch(-20, -30, 500, 500);
 		expect(patch.balance).toBe(490);
 		expect(patch.total_funded).toBeUndefined();
+	});
+});
+
+// ── computeTransactionDeletePatch ─────────────────────────────────────────
+
+describe('computeTransactionDeletePatch', () => {
+	it('reverses a balance adjustment without changing total funded', () => {
+		const patch = computeTransactionDeletePatch(25, 0, 500, true);
+		expect(patch).toEqual({ balance: -25 });
+	});
+
+	it('reverses regular income and total funded', () => {
+		const patch = computeTransactionDeletePatch(25, 100, 500);
+		expect(patch).toEqual({ balance: 75, total_funded: 475 });
+	});
+
+	it('reverses a negative adjustment back into the balance', () => {
+		const patch = computeTransactionDeletePatch(-100, 0, 500, true);
+		expect(patch).toEqual({ balance: 100 });
 	});
 });

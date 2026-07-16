@@ -7,6 +7,7 @@
 		getTransactions,
 		getTransactionsPaged,
 		getTransactionSummary,
+		resetWalletBalance,
 		deleteTransaction as removeTransaction
 	} from '$lib/transactions.remote';
 	import type { Transaction, SavedPeriod } from '$lib/types/budget';
@@ -19,7 +20,7 @@
 	import TransactionForm from '$lib/components/TransactionForm.svelte';
 	import EditTransactionForm from '$lib/components/EditTransactionForm.svelte';
 	import TransferForm from '$lib/components/TransferForm.svelte';
-	import { getStandardPeriodRange, getPayCycleRange, getPayCycleOffsetForDate } from '$lib/utils/dateRange';
+	import { getStandardPeriodRange, getPayCycleRange, getPayCycleOffsetForDate, todayYmd } from '$lib/utils/dateRange';
 
 	const BUILTIN_PERIODS: { value: string; label: string }[] = [
 		{ value: 'this-month', label: 'This Month' },
@@ -36,10 +37,12 @@
 	let showAddTransaction = $state(false);
 	let showTransfer = $state(false);
 	let showDeleteConfirm = $state(false);
+	let showResetBalanceConfirm = $state(false);
 	let deleteConfirmName = $state('');
 	let transactionToDelete = $state<Transaction | null>(null);
 	let transactionToEdit = $state<Transaction | null>(null);
 	let reconciling = $state(false);
+	let resettingBalance = $state(false);
 	let archiving = $state(false);
 	let error = $state('');
 
@@ -272,6 +275,20 @@
 		}
 	}
 
+	async function handleResetBalance() {
+		resettingBalance = true;
+		try {
+			await resetWalletBalance({ walletId, date: todayYmd() });
+			refreshPagedQuery();
+			showResetBalanceConfirm = false;
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to reset wallet balance';
+			showResetBalanceConfirm = false;
+		} finally {
+			resettingBalance = false;
+		}
+	}
+
 	function formatCurrency(amount: number, currency: string): string {
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 	}
@@ -369,6 +386,14 @@
 								⚙
 							</button>
 							<ul class="dropdown-content menu bg-base-100 rounded-box shadow-lg border border-base-200 w-48 p-1 z-10">
+								<li>
+									<button
+										onclick={() => (showResetBalanceConfirm = true)}
+										disabled={wallet.balance === 0}
+									>
+										Reset balance to $0
+									</button>
+								</li>
 								{#if wallet.archived}
 									<li>
 										<button onclick={handleUnarchiveWallet} disabled={archiving}>
@@ -684,6 +709,28 @@
 						refreshPagedQuery();
 					}}
 				/>
+		</Modal>
+
+		<!-- Reset Balance Confirmation Modal -->
+		<Modal bind:open={showResetBalanceConfirm} title="Reset Balance?">
+			<p class="text-base-content/70">
+				Set <strong>{wallet.name}</strong>'s balance from
+				<strong>{formatCurrency(wallet.balance, wallet.currency)}</strong> to
+				<strong>{formatCurrency(0, wallet.currency)}</strong>? A dated balance adjustment will preserve
+				your transaction history and can be deleted later to undo the reset.
+			</p>
+			{#snippet actions()}
+				<Button
+					variant="ghost"
+					onclick={() => (showResetBalanceConfirm = false)}
+					disabled={resettingBalance}
+				>
+					Cancel
+				</Button>
+				<Button variant="error" onclick={handleResetBalance} loading={resettingBalance}>
+					Reset to {formatCurrency(0, wallet.currency)}
+				</Button>
+			{/snippet}
 		</Modal>
 
 		<!-- Delete Wallet Confirmation Modal -->

@@ -42,3 +42,22 @@ export function computeWalletPatch(
 
 	return patch;
 }
+
+/**
+ * Computes the wallet patch needed when deleting a regular transaction.
+ * Positive balance adjustments are excluded from total_funded because they
+ * reconcile the wallet rather than represent new income.
+ */
+export function computeTransactionDeletePatch(
+	transactionAmount: number,
+	currentBalance: number,
+	currentTotalFunded: number,
+	isBalanceAdjustment = false
+): { balance: number; total_funded?: number } {
+	return {
+		balance: currentBalance - transactionAmount,
+		...(transactionAmount > 0 && !isBalanceAdjustment && {
+			total_funded: currentTotalFunded - transactionAmount
+		})
+	};
+}

@@ -131,6 +131,7 @@ export const TransactionSchema = z.object({
 	recur_day: z.number().catch(0),
 	recurring_source_id: z.string().catch(''),
 	transfer_id: z.string().catch(''),
+	balance_adjustment: z.boolean().catch(false),
 	created: z.string()
 });
 

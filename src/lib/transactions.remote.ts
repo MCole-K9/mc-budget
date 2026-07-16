@@ -3,7 +3,11 @@ import { query, command, form } from '$app/server';
 import { invalid } from '@sveltejs/kit';
 import { getPb } from '$lib/server/db';
 import { TransactionSchema, WalletSchema, UpdateTransactionInputSchema } from '$lib/schemas/budget';
-import { computeWalletPatch, computeTransferDeleteDeltas } from '$lib/utils/balance';
+import {
+	computeWalletPatch,
+	computeTransferDeleteDeltas,
+	computeTransactionDeletePatch
+} from '$lib/utils/balance';
 import { getWallet } from '$lib/wallets.remote';
 
 export const getTransactions = query(z.string(), async (walletId) => {
@@ -28,7 +32,7 @@ export const getTransactionSummary = query(GetTransactionSummarySchema, async (i
 
 	const records = await getPb().collection('transactions').getFullList({
 		filter,
-		fields: 'amount,category,transfer_id',
+		fields: 'amount,category,transfer_id,balance_adjustment',
 		requestKey: null
 	});
 
@@ -38,6 +42,7 @@ export const getTransactionSummary = query(GetTransactionSummarySchema, async (i
 
 	for (const r of records) {
 		const amount = Number(r.amount) || 0;
+		if (r.balance_adjustment) continue;
 		if (r.transfer_id) {
 			if (amount > 0) income += amount;
 			else transfersOut += Math.abs(amount);
@@ -134,7 +139,7 @@ export const getAllTransactionsSummary = query(GetAllTransactionsSummarySchema, 
 
 	const records = await getPb().collection('transactions').getFullList({
 		filter: filter || undefined,
-		fields: 'amount,wallet,transfer_id',
+		fields: 'amount,wallet,transfer_id,balance_adjustment',
 		expand: 'wallet',
 		requestKey: null
 	});
@@ -153,7 +158,7 @@ export const getAllTransactionsSummary = query(GetAllTransactionsSummarySchema, 
 				created: String(w.created ?? '').split('T')[0].split(' ')[0]
 			});
 		}
-		if (r.transfer_id) continue;
+		if (r.transfer_id || r.balance_adjustment) continue;
 		const amount = Number(r.amount) || 0;
 		if (!byCurrency[currency]) byCurrency[currency] = { income: 0, expense: 0 };
 		if (amount > 0) byCurrency[currency].income += amount;
@@ -210,6 +215,7 @@ export const getReport = query(GetReportInputSchema, async (input) => {
 
 	for (const r of records) {
 		const isTransfer = !!r.transfer_id;
+		const isAdjustment = !!r.balance_adjustment;
 		const amount = Number(r.amount) || 0;
 		const date = String(r.date).split('T')[0].split(' ')[0];
 		const month = date.slice(0, 7);
@@ -219,26 +225,26 @@ export const getReport = query(GetReportInputSchema, async (input) => {
 		const category = String(r.category);
 		const color = cats.find((c) => c.name.toLowerCase() === category.toLowerCase())?.color ?? '#9ca3af';
 
-		if (!isTransfer) {
+		if (!isTransfer && !isAdjustment) {
 			if (!byCurrency[currency]) byCurrency[currency] = { income: 0, expense: 0 };
 			if (amount > 0) byCurrency[currency].income += amount;
 			else byCurrency[currency].expense += Math.abs(amount);
 		}
 
-		if (!isTransfer && amount < 0) {
+		if (!isTransfer && !isAdjustment && amount < 0) {
 			if (!byCategory[currency]) byCategory[currency] = {};
 			if (!byCategory[currency][category]) byCategory[currency][category] = { spent: 0, color };
 			byCategory[currency][category].spent += Math.abs(amount);
 		}
 
-		if (!isTransfer) {
+		if (!isTransfer && !isAdjustment) {
 			if (!byMonth[month]) byMonth[month] = {};
 			if (!byMonth[month][currency]) byMonth[month][currency] = { income: 0, expense: 0 };
 			if (amount > 0) byMonth[month][currency].income += amount;
 			else byMonth[month][currency].expense += Math.abs(amount);
 		}
 
-		if (!isTransfer && amount < 0) {
+		if (!isTransfer && !isAdjustment && amount < 0) {
 			topExpenses.push({
 				id: String(r.id),
 				description: String(r.description || ''),
@@ -343,6 +349,46 @@ export const createTransaction = form(CreateTransactionFormSchema, async (input)
 	return TransactionSchema.parse(record);
 });
 
+const ResetWalletBalanceSchema = z.object({
+	walletId: z.string().min(1, 'Wallet ID required'),
+	date: z.string().refine((v) => !isNaN(Date.parse(v)), 'Invalid date format')
+});
+
+export const resetWalletBalance = command(ResetWalletBalanceSchema, async ({ walletId, date }) => {
+	const pb = getPb();
+	const wallet = WalletSchema.parse(
+		await pb.collection('wallets').getOne(walletId, { requestKey: null })
+	);
+
+	if (wallet.balance === 0) return { success: true, adjustment: null };
+
+	const adjustment = TransactionSchema.parse(
+		await pb.collection('transactions').create({
+			wallet: walletId,
+			category: 'Balance adjustment',
+			amount: -wallet.balance,
+			description: 'Wallet reconciled to zero',
+			date,
+			balance_adjustment: true
+		})
+	);
+
+	try {
+		await pb.collection('wallets').update(walletId, { balance: 0 });
+	} catch (error) {
+		try {
+			await pb.collection('transactions').delete(adjustment.id);
+		} catch {
+			throw new Error('Reset failed and the balance adjustment could not be rolled back.');
+		}
+		throw error;
+	}
+
+	getTransactions(walletId).refresh();
+	getWallet(walletId).refresh();
+	return { success: true, adjustment };
+});
+
 export const updateTransaction = command(UpdateTransactionInputSchema, async (input) => {
 	const pb = getPb();
 	const existing = TransactionSchema.parse(
@@ -350,6 +396,9 @@ export const updateTransaction = command(UpdateTransactionInputSchema, async (in
 	);
 	if (existing.wallet !== input.walletId) {
 		throw new Error('Transaction does not belong to the specified wallet');
+	}
+	if (existing.balance_adjustment) {
+		throw new Error('Balance adjustments cannot be edited. Delete the adjustment instead.');
 	}
 
 	const wallet = WalletSchema.parse(
@@ -505,10 +554,15 @@ export const deleteTransaction = command(
 		}
 
 		await pb.collection('transactions').delete(id, { requestKey: null });
-		await pb.collection('wallets').update(transaction.wallet, {
-			balance: wallet.balance - transaction.amount,
-			...(transaction.amount > 0 && { total_funded: wallet.total_funded - transaction.amount })
-		});
+		await pb.collection('wallets').update(
+			transaction.wallet,
+			computeTransactionDeletePatch(
+				transaction.amount,
+				wallet.balance,
+				wallet.total_funded,
+				transaction.balance_adjustment
+			)
+		);
 
 		getTransactions(transaction.wallet).refresh();
 		getWallet(transaction.wallet).refresh();

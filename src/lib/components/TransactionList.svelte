@@ -82,6 +82,9 @@
 										{#if transaction.transfer_id}
 											<span class="text-base-content/30 text-xs ml-1" title="Transfer">⇄</span>
 										{/if}
+										{#if transaction.balance_adjustment}
+											<span class="text-base-content/30 text-xs ml-1" title="Balance adjustment">◎</span>
+										{/if}
 									</p>
 									<p class="text-xs text-base-content/40 truncate">{transaction.category}</p>
 								</div>
@@ -99,7 +102,7 @@
 											title="View receipt"
 										>🧾</a>
 									{/if}
-									{#if onedit && !transaction.transfer_id}
+									{#if onedit && !transaction.transfer_id && !transaction.balance_adjustment}
 										<button
 											class="btn btn-ghost btn-xs text-base-content/20 hover:text-base-content/70"
 											onclick={() => onedit(transaction)}
