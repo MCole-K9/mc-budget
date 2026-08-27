@@ -1,19 +1,31 @@
 import { z } from 'zod';
-import { command, form, getRequestEvent } from '$app/server';
+import { command, form } from '$app/server';
 import { redirect, invalid } from '@sveltejs/kit';
 import { resolve } from '$app/paths';
 import { getPb } from '$lib/server/db';
+import { getPrivateInstance } from '$lib/server/settings';
 import { LoginInputSchema, RegisterInputSchema } from '$lib/schemas/budget';
 
 /**
  * Login with email and password
  */
 export const login = form(LoginInputSchema, async (input) => {
+	const pb = getPb();
+	let isApproved = false;
+
 	try {
-		await getPb().collection('users').authWithPassword(input.email, input._password);
+		const authData = await pb.collection('users').authWithPassword(input.email, input._password);
+		isApproved = authData.record.approved === true;
 	} catch {
+		pb.authStore.clear();
 		invalid('Invalid email or password');
 	}
+
+	if (!isApproved && (await getPrivateInstance())) {
+		pb.authStore.clear();
+		invalid('Your account is awaiting administrator approval.');
+	}
+
 	redirect(303, resolve('/wallets'));
 });
 
@@ -22,21 +34,27 @@ export const login = form(LoginInputSchema, async (input) => {
  */
 export const register = form(RegisterInputSchema, async (input) => {
 	try {
-		await getPb().collection('users').create({
-			email: input.email,
-			password: input._password,
-			passwordConfirm: input._passwordConfirm,
-			name: input.name || ''
-		});
-	} catch (err: any) {
-		if (err.response?.data?.email?.code === 'validation_not_unique') {
+		await getPb()
+			.collection('users')
+			.create({
+				email: input.email,
+				password: input._password,
+				passwordConfirm: input._passwordConfirm,
+				name: input.name || ''
+			});
+	} catch (err: unknown) {
+		const errorResponse = (err as { response?: { data?: { email?: { code?: string } } } }).response;
+		if (errorResponse?.data?.email?.code === 'validation_not_unique') {
 			invalid('An account with this email already exists');
 		}
 		invalid('Failed to create account');
 	}
 
-	await getPb().collection('users').authWithPassword(input.email, input._password);
-	redirect(303, resolve('/wallets'));
+	const isPrivateInstance = await getPrivateInstance();
+	redirect(
+		303,
+		isPrivateInstance ? `${resolve('/auth/login')}?approval=pending` : resolve('/auth/login')
+	);
 });
 
 /**
@@ -66,15 +84,12 @@ export const refreshAuth = command(async () => {
 /**
  * Update user profile
  */
-export const updateProfile = command(
-	z.object({ name: z.string().optional() }),
-	async (data) => {
-		const pb = getPb();
-		const user = pb.authStore.record;
-		if (!user) throw new Error('Not authenticated');
-		return await pb.collection('users').update(user.id, data);
-	}
-);
+export const updateProfile = command(z.object({ name: z.string().optional() }), async (data) => {
+	const pb = getPb();
+	const user = pb.authStore.record;
+	if (!user) throw new Error('Not authenticated');
+	return await pb.collection('users').update(user.id, data);
+});
 
 /**
  * Change user password

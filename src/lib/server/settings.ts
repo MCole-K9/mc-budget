@@ -1,4 +1,5 @@
 import { withAdminPb } from './db';
+import { setTenantCollectionRules } from './tenantAccess';
 import { env as privateEnv } from '$env/dynamic/private';
 import { AI_PROVIDERS, type AiProvider } from '$lib/settings';
 
@@ -37,6 +38,40 @@ async function getSetting(key: string): Promise<string> {
 		});
 	} catch {
 		return '';
+	}
+}
+
+/**
+ * Private instances require administrator approval before an account can use tenant data.
+ * The default is private to preserve the existing access policy until an admin opts out.
+ */
+export async function getPrivateInstance(): Promise<boolean> {
+	return (await getSetting('private_instance')) !== 'false';
+}
+
+export async function setPrivateInstance(isPrivateInstance: boolean): Promise<void> {
+	if (isPrivateInstance) {
+		// Restrict data access before enabling the application-level gate.
+		await setTenantCollectionRules(true);
+		await upsertSetting('private_instance', 'true');
+		return;
+	}
+
+	const wasPrivate = await getPrivateInstance();
+	// Allow the application-level gate to open before relaxing data rules. If the atomic import
+	// fails or its outcome is indeterminate, recovery reasserts restrictive rules before restoring
+	// the prior private setting.
+	await upsertSetting('private_instance', 'false');
+	try {
+		await setTenantCollectionRules(false);
+	} catch (error) {
+		if (wasPrivate) {
+			// An HTTP error can arrive after PocketBase commits the public import. Reassert the
+			// restrictive data boundary before reporting this instance as private again.
+			await setTenantCollectionRules(true);
+			await upsertSetting('private_instance', 'true');
+		}
+		throw error;
 	}
 }
 

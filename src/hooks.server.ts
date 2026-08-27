@@ -3,6 +3,7 @@ import { dev } from '$app/environment';
 import { resolve } from '$app/paths';
 import { env } from '$env/dynamic/public';
 import PocketBase from 'pocketbase';
+import { getPrivateInstance } from '$lib/server/settings';
 
 const guestOnlyRoutes: string[] = [resolve('/auth/login'), resolve('/auth/register')];
 
@@ -11,6 +12,7 @@ function isProtectedRoute(pathname: string) {
 	const presetsPath = resolve('/presets');
 	const transactionsPath = resolve('/transactions');
 	const reportsPath = resolve('/reports');
+	const recurringPath = resolve('/recurring');
 	const settingsPath = resolve('/settings');
 
 	return (
@@ -22,6 +24,8 @@ function isProtectedRoute(pathname: string) {
 		pathname.startsWith(`${transactionsPath}/`) ||
 		pathname === reportsPath ||
 		pathname.startsWith(`${reportsPath}/`) ||
+		pathname === recurringPath ||
+		pathname.startsWith(`${recurringPath}/`) ||
 		pathname === settingsPath ||
 		pathname.startsWith(`${settingsPath}/`)
 	);
@@ -47,12 +51,24 @@ export const handle: Handle = async ({ event, resolve: resolveRequest }) => {
 
 	const pathname = event.url.pathname;
 	const isAuthenticated = !!event.locals.user;
+	const isApproved = event.locals.user?.approved === true;
 
-	if (!isAuthenticated && isProtectedRoute(pathname)) {
+	// A valid PocketBase token alone is not enough to access the tenant. Clear
+	// sessions for accounts that have not yet been approved by an administrator.
+	if (isAuthenticated && !isApproved && (await getPrivateInstance())) {
+		event.locals.pb.authStore.clear();
+		event.locals.user = null;
+
+		if (isProtectedRoute(pathname)) {
+			redirect(303, `${resolve('/auth/login')}?approval=required`);
+		}
+	}
+
+	if (!event.locals.user && isProtectedRoute(pathname)) {
 		redirect(303, resolve('/auth/login'));
 	}
 
-	if (isAuthenticated && isGuestOnlyRoute(pathname)) {
+	if (event.locals.user && isGuestOnlyRoute(pathname)) {
 		redirect(303, resolve('/wallets'));
 	}
 

@@ -1,9 +1,16 @@
 import { query, command } from '$app/server';
 import { z } from 'zod';
 import { AI_PROVIDERS } from '$lib/settings';
-import { getPb } from '$lib/server/db';
+import { getPb, withAdminPb } from '$lib/server/db';
 import { error } from '@sveltejs/kit';
-import { getAiKey, getAiProvider, setAiKey, setAiProvider } from '$lib/server/settings';
+import {
+	getAiKey,
+	getAiProvider,
+	getPrivateInstance,
+	setAiKey,
+	setAiProvider,
+	setPrivateInstance
+} from '$lib/server/settings';
 import { getUserSetting, setUserSetting, deleteUserSetting } from '$lib/server/userSettings';
 import { fetchRates } from '$lib/server/exchangeRates';
 
@@ -19,18 +26,86 @@ function requireAdmin() {
 	return user;
 }
 
+export type ManagedAccount = {
+	id: string;
+	name: string;
+	email: string;
+	created: string;
+};
+
+function getAccounts(filter: string): Promise<ManagedAccount[]> {
+	return withAdminPb(async (pb) => {
+		const records = await pb.collection('users').getFullList({
+			filter,
+			sort: '+created',
+			fields: 'id,name,email,created'
+		});
+
+		return records.map((record) => ({
+			id: record.id,
+			name: String(record['name'] ?? ''),
+			email: String(record['email']),
+			created: String(record['created'])
+		}));
+	});
+}
+
+export const getPendingAccounts = query(async (): Promise<ManagedAccount[]> => {
+	requireAdmin();
+	if (!(await getPrivateInstance())) return [];
+	return getAccounts('approved = false && admin = false');
+});
+
+export const getApprovedAccounts = query(async (): Promise<ManagedAccount[]> => {
+	requireAdmin();
+	if (!(await getPrivateInstance())) return [];
+	return getAccounts('approved = true && admin = false');
+});
+
+export const approveAccount = command(z.string().min(1), async (accountId) => {
+	const admin = requireAdmin();
+	if (!(await getPrivateInstance()))
+		error(400, 'Account approval is available only on private instances');
+	if (admin.id === accountId) error(400, 'You cannot approve your own account');
+
+	await withAdminPb(async (pb) => {
+		const account = await pb.collection('users').getOne(accountId);
+		if (account['admin'] === true) error(403, 'Administrator accounts cannot be changed here');
+		await pb.collection('users').update(accountId, { approved: true });
+	});
+
+	return { success: true };
+});
+
+export const revokeAccount = command(z.string().min(1), async (accountId) => {
+	const admin = requireAdmin();
+	if (!(await getPrivateInstance()))
+		error(400, 'Account approval is available only on private instances');
+	if (admin.id === accountId) error(400, 'You cannot revoke your own account');
+
+	await withAdminPb(async (pb) => {
+		const account = await pb.collection('users').getOne(accountId);
+		if (account['admin'] === true) error(403, 'Administrator accounts cannot be changed here');
+		await pb.collection('users').update(accountId, { approved: false });
+	});
+
+	return { success: true };
+});
+
 export const getAiSettings = query(async () => {
 	const user = requireAuth();
 	const isAdmin = !!user['admin'];
 
-	const [provider, anthropicKey, openaiKey, googleKey] = await Promise.all([
+	const [provider, anthropicKey, openaiKey, googleKey, isPrivateInstance] = await Promise.all([
 		getAiProvider(),
 		getAiKey('anthropic'),
 		getAiKey('openai'),
-		getAiKey('google')
+		getAiKey('google'),
+		getPrivateInstance()
 	]);
 	return {
 		isAdmin,
+		isPrivateInstance,
 		activeProvider: provider,
 		keys: {
 			anthropic: !!anthropicKey,
@@ -38,6 +113,12 @@ export const getAiSettings = query(async () => {
 			google: !!googleKey
 		}
 	};
+});
+
+export const updatePrivateInstance = command(z.boolean(), async (isPrivateInstance) => {
+	requireAdmin();
+	await setPrivateInstance(isPrivateInstance);
+	return { success: true, isPrivateInstance };
 });
 
 export const saveProviderKey = command(

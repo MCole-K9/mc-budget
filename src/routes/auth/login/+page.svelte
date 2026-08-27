@@ -1,24 +1,37 @@
 <script lang="ts">
 	import { login } from '$lib/auth.remote';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import Button from '$lib/components/Button.svelte';
 
 	const loginForm = login;
+	const approvalPending = $derived(page.url.searchParams.get('approval') === 'pending');
+	const approvalRequired = $derived(page.url.searchParams.get('approval') === 'required');
 </script>
 
 <svelte:head>
 	<title>Sign In - MC Budget</title>
 </svelte:head>
 
-<div class="max-w-sm mx-auto mt-8">
-	<div class="text-center mb-8">
+<div class="mx-auto mt-8 max-w-sm">
+	<div class="mb-8 text-center">
 		<h1 class="text-2xl font-bold">Welcome back</h1>
-		<p class="text-base-content/50 text-sm mt-1">Sign in to MC Budget</p>
+		<p class="mt-1 text-sm text-base-content/50">Sign in to MC Budget</p>
 	</div>
 
-	<div class="rounded-2xl bg-base-100 shadow-sm p-6 space-y-4">
+	<div class="space-y-4 rounded-2xl bg-base-100 p-6 shadow-sm">
+		{#if approvalPending}
+			<div class="rounded-xl bg-success/10 px-4 py-3 text-sm text-success">
+				Account created. An administrator must approve it before you can sign in.
+			</div>
+		{:else if approvalRequired}
+			<div class="rounded-xl bg-warning/10 px-4 py-3 text-sm text-warning">
+				Your account must be approved by an administrator before you can use MC Budget.
+			</div>
+		{/if}
+
 		{#each loginForm.fields.allIssues() as issue (issue.message)}
-			<div class="text-sm text-error bg-error/10 rounded-xl px-4 py-3">{issue.message}</div>
+			<div class="rounded-xl bg-error/10 px-4 py-3 text-sm text-error">{issue.message}</div>
 		{/each}
 
 		<form {...loginForm} class="space-y-4">
@@ -27,7 +40,7 @@
 				<input
 					{...loginForm.fields.email.as('email')}
 					id="email"
-					class="input input-bordered w-full"
+					class="input-bordered input w-full"
 					placeholder="you@example.com"
 				/>
 				{#each loginForm.fields.email.issues() as issue (issue.message)}
@@ -40,7 +53,7 @@
 				<input
 					{...loginForm.fields._password.as('password')}
 					id="password"
-					class="input input-bordered w-full"
+					class="input-bordered input w-full"
 					placeholder="Enter your password"
 				/>
 				{#each loginForm.fields._password.issues() as issue (issue.message)}
@@ -48,14 +61,14 @@
 				{/each}
 			</div>
 
-			<Button type="submit" variant="primary" class="w-full mt-2" loading={!!loginForm.pending}>
+			<Button type="submit" variant="primary" class="mt-2 w-full" loading={!!loginForm.pending}>
 				Sign In
 			</Button>
 		</form>
 	</div>
 
-	<p class="text-center mt-5 text-sm text-base-content/50">
+	<p class="mt-5 text-center text-sm text-base-content/50">
 		Don't have an account?
-		<a href={resolve('/auth/register')} class="link link-primary font-medium">Sign up</a>
+		<a href={resolve('/auth/register')} class="link font-medium link-primary">Sign up</a>
 	</p>
 </div>

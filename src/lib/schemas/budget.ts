@@ -163,15 +163,19 @@ export const RecurringScheduleSchema = z.object({
 export type RecurringSchedule = z.infer<typeof RecurringScheduleSchema>;
 
 // User Schema (matches PocketBase auth record)
-export const UserSchema = z.object({
-	id: z.string(),
-	email: z.string().email(),
-	name: z.string().optional().default(''),
-	avatar: z.string().optional().default(''),
-	verified: z.boolean().optional(),
-	created: z.string(),
-	updated: z.string()
-}).passthrough();
+export const UserSchema = z
+	.object({
+		id: z.string(),
+		email: z.string().email(),
+		name: z.string().optional().default(''),
+		avatar: z.string().optional().default(''),
+		verified: z.boolean().optional(),
+		approved: z.boolean().optional().default(false),
+		admin: z.boolean().optional().default(false),
+		created: z.string(),
+		updated: z.string()
+	})
+	.passthrough();
 
 export type User = z.infer<typeof UserSchema>;
 
