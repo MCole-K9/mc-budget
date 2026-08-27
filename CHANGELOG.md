@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/MCole-K9/mc-budget/compare/v1.5.0...v1.6.0) (2026-07-16)
+
+
+### Features
+
+* implement balance adjustment feature with related UI and backend updates ([4413b18](https://github.com/MCole-K9/mc-budget/commit/4413b184b6eb089e58e5f8f3bf099dac354ff39d))
+
 ## [1.5.0](https://github.com/MCole-K9/mc-budget/compare/v1.4.0...v1.5.0) (2026-07-15)
 
 
