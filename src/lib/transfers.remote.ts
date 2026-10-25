@@ -45,8 +45,10 @@ export const transferBetweenWallets = form(TransferFormSchema, async (input) => 
 
 	let debit: unknown;
 	let credit: unknown;
-	let sourceWalletUpdated = false;
-	let destWalletUpdated = false;
+	// Set before each wallet update: a request can fail on the client after the server applied it,
+	// and restoring the snapshot is harmless when the update never landed.
+	let sourceWalletUpdateStarted = false;
+	let destWalletUpdateStarted = false;
 
 	try {
 		debit = await pb.collection('transactions').create({
@@ -67,30 +69,31 @@ export const transferBetweenWallets = form(TransferFormSchema, async (input) => 
 			transfer_id: transferId
 		}, { requestKey: null });
 
+		sourceWalletUpdateStarted = true;
 		await pb.collection('wallets').update(input.sourceWalletId, {
 			balance: sourceWallet.balance - input.amount
 		}, { requestKey: null });
-		sourceWalletUpdated = true;
 
+		destWalletUpdateStarted = true;
 		await pb.collection('wallets').update(input.destWalletId, {
 			balance: destWallet.balance + creditAmount,
 			total_funded: destWallet.total_funded + creditAmount
 		}, { requestKey: null });
-		destWalletUpdated = true;
 	} catch (error) {
 		const rollbackErrors: string[] = [];
 
-		if (destWalletUpdated) {
+		if (destWalletUpdateStarted) {
 			try {
 				await pb.collection('wallets').update(input.destWalletId, {
-					balance: destWallet.balance
+					balance: destWallet.balance,
+					total_funded: destWallet.total_funded
 				}, { requestKey: null });
 			} catch {
 				rollbackErrors.push('destination wallet rollback failed');
 			}
 		}
 
-		if (sourceWalletUpdated) {
+		if (sourceWalletUpdateStarted) {
 			try {
 				await pb.collection('wallets').update(input.sourceWalletId, {
 					balance: sourceWallet.balance

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { query, command } from '$app/server';
 import { getPb } from '$lib/server/db';
 import { CreateWalletInputSchema, WalletSchema, TransactionSchema, UpdateWalletPrefsInputSchema } from '$lib/schemas/budget';
+import { validateCategories } from '$lib/validation/budget';
 
 export const getWallets = query(async () => {
 	const records = await getPb().collection('wallets').getFullList({
@@ -31,15 +32,9 @@ export const createWallet = command(CreateWalletInputSchema, async (input) => {
 	const user = pb.authStore.record;
 	if (!user) throw new Error('User must be authenticated to create a wallet');
 
-	// Server-side validation based on budget_type
-	if (input.budget_type === 'percentage') {
-		const total = input.categories.reduce((sum, c) => sum + c.percentage, 0);
-		if (Math.abs(total - 100) >= 0.01) throw new Error('Categories must total exactly 100%');
-	} else {
-		if (input.categories.some((c) => !c.fixedAmount || c.fixedAmount <= 0)) {
-			throw new Error('All fixed-amount categories must have an amount greater than 0');
-		}
-	}
+	// Same rules as the client: totals/amounts per budget_type, and no duplicate names
+	const validation = validateCategories(input.categories, input.budget_type);
+	if (!validation.valid) throw new Error(validation.errors[0]);
 
 	const record = await pb.collection('wallets').create({
 		user: user.id,

@@ -316,7 +316,7 @@
 	const periodIncome = $derived(
 		selectedPeriod === 'all-time'
 			? wallet.total_funded
-			: summary.income + (inDateRange(wallet.created.split('T')[0]) ? wallet.initial_balance : 0)
+			: summary.income + (inDateRange(wallet.created.split('T')[0].split(' ')[0]) ? wallet.initial_balance : 0)
 	);
 
 	// Total expenses charged to categories in the current period.
@@ -325,11 +325,11 @@
 	);
 
 	// Net income available for budget allocation.
-	// carry_forward mode: use current balance re-grossed by period spending (balance = what's left after spending).
+	// carry_forward mode: use the balance at the end of the period re-grossed by period spending (balance = what's left after spending).
 	// Normal mode: period income minus outgoing transfers, floored at 0.
 	const effectivePeriodIncome = $derived(
 		wallet.carry_forward
-			? Math.max(0, wallet.balance + totalSpentThisPeriod)
+			? Math.max(0, wallet.balance - summary.netAfterEnd + totalSpentThisPeriod)
 			: Math.max(0, periodIncome - summary.transfersOut)
 	);
 

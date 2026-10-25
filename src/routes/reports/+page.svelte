@@ -48,12 +48,19 @@
 
 	const summaryEntries = $derived(Object.entries(report.byCurrency));
 
-	const showConvertedTotal = $derived(summaryEntries.length > 1);
+	// The rate lookup falls back to just the base currency when the API is down; never convert 1:1
+	const ratesAvailable = $derived(
+		summaryEntries.every(([currency]) => typeof rates[currency] === 'number')
+	);
+
+	const multiCurrency = $derived(summaryEntries.length > 1);
+	const showConvertedTotal = $derived(multiCurrency && ratesAvailable);
+	const ratesMissing = $derived(multiCurrency && !ratesAvailable);
 
 	const convertedTotal = $derived((() => {
 		let income = 0, expense = 0;
 		for (const [currency, data] of summaryEntries) {
-			const r = rates[currency] ?? 1;
+			const r = rates[currency];
 			income += data.income / r;
 			expense += data.expense / r;
 		}
@@ -106,7 +113,7 @@
 			const getMonthValue = (month: string, field: 'income' | 'expense') => {
 				if (showConvertedTotal) {
 					return Object.entries(report.byMonth[month] ?? {}).reduce((sum, [currency, data]) => {
-						return sum + data[field] / (rates[currency] ?? 1);
+						return sum + data[field] / rates[currency];
 					}, 0);
 				}
 				return report.byMonth[month]?.[primaryCurrency]?.[field] ?? 0;
@@ -297,6 +304,11 @@
 						</p>
 					</div>
 				</div>
+			{/if}
+			{#if ratesMissing}
+				<p class="text-xs text-base-content/50">
+					Exchange rates are unavailable right now, so totals are not combined into {baseCurrency}. The monthly trend shows {primaryCurrency} only.
+				</p>
 			{/if}
 			{/if}
 

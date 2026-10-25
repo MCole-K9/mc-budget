@@ -8,7 +8,9 @@ declare global {
 			user: RecordModel | null;
 		}
 		// interface PageData {}
-		// interface PageState {}
+		interface PageState {
+			presetId?: string;
+		}
 		// interface Platform {}
 	}
 }

@@ -26,15 +26,28 @@ const GetTransactionSummarySchema = z.object({
 });
 
 export const getTransactionSummary = query(GetTransactionSummarySchema, async (input) => {
-	let filter = `wallet = "${input.walletId}"`;
+	const walletFilter = `wallet = "${input.walletId}"`;
+	const endOfDay = `${input.endDate} 23:59:59.999Z`;
+	let filter = walletFilter;
 	if (input.startDate) filter += ` && date >= "${input.startDate}"`;
-	if (input.endDate) filter += ` && date <= "${input.endDate} 23:59:59.999Z"`;
+	if (input.endDate) filter += ` && date <= "${endOfDay}"`;
 
-	const records = await getPb().collection('transactions').getFullList({
-		filter,
-		fields: 'amount,category,transfer_id,balance_adjustment',
-		requestKey: null
-	});
+	const [records, laterRecords] = await Promise.all([
+		getPb().collection('transactions').getFullList({
+			filter,
+			fields: 'amount,category,transfer_id,balance_adjustment',
+			requestKey: null
+		}),
+		// Dated after the period: subtracted from the current balance to get the period's closing balance
+		input.endDate
+			? getPb().collection('transactions').getFullList({
+					filter: `${walletFilter} && date > "${endOfDay}"`,
+					fields: 'amount',
+					requestKey: null
+				})
+			: Promise.resolve([])
+	]);
+	const netAfterEnd = laterRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
 
 	let income = 0;
 	let transfersOut = 0;
@@ -56,7 +69,7 @@ export const getTransactionSummary = query(GetTransactionSummarySchema, async (i
 		}
 	}
 
-	return { income, transfersOut, spendingByCategory };
+	return { income, transfersOut, spendingByCategory, netAfterEnd };
 });
 
 const GetTransactionsPagedSchema = z.object({
@@ -139,7 +152,9 @@ export const getAllTransactionsSummary = query(GetAllTransactionsSummarySchema, 
 
 	const records = await getPb().collection('transactions').getFullList({
 		filter: filter || undefined,
-		fields: 'amount,wallet,transfer_id,balance_adjustment',
+		// `fields` also filters `expand`, so the wallet fields must be listed explicitly
+		fields:
+			'amount,wallet,transfer_id,balance_adjustment,expand.wallet.currency,expand.wallet.initial_balance,expand.wallet.created',
 		expand: 'wallet',
 		requestKey: null
 	});

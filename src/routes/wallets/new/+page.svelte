@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { createWallet } from '$lib/wallets.remote';
 	import { getPresets } from '$lib/presets.remote';
@@ -29,6 +30,10 @@
 	const presets = await getPresets();
 
 	const categoriesValid = $derived(validateCategories(categories, budgetType).valid);
+
+	// Preselected from the Presets page ("Use preset")
+	const requestedPreset = presets.find((p) => p.id === page.state.presetId);
+	if (requestedPreset) handlePresetSelect(requestedPreset);
 
 	function handlePresetSelect(preset: BudgetPreset) {
 		selectedPresetId = preset.id;

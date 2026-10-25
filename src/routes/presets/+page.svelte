@@ -58,7 +58,7 @@
 	}
 
 	function usePreset(preset: BudgetPreset) {
-		goto(resolve('/wallets/new'));
+		goto(resolve('/wallets/new'), { state: { presetId: preset.id } });
 	}
 </script>
 

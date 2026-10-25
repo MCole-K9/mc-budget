@@ -79,7 +79,8 @@ export function getPayCycleRange(cycleStartDay: number, cycleOffset: number, now
 	const day = Math.min(cycleStartDay, 28);
 	const baseOffset = now.getDate() >= day ? 0 : -1;
 	const startDate = new Date(now.getFullYear(), now.getMonth() + baseOffset + cycleOffset, day);
-	const endDate = new Date(now.getFullYear(), now.getMonth() + baseOffset + 1 + cycleOffset, day);
+	// Ends the day before the next cycle starts, so the boundary day is counted once
+	const endDate = new Date(now.getFullYear(), now.getMonth() + baseOffset + 1 + cycleOffset, day - 1);
 	return { startDate: toYmd(startDate), endDate: toYmd(endDate) };
 }
 

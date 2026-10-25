@@ -1,39 +1,46 @@
 import { withAdminPb } from './db';
 
+// Records can only be created for, or reassigned to, the requesting user (or their own wallets).
+// Keep in sync with pb_migrations/11_owner_write_rules.js.
+const ownerCreate = "@request.auth.id != '' && @request.body.user = @request.auth.id";
+const keepsOwner = '(@request.body.user:isset = false || @request.body.user = @request.auth.id)';
+const keepsWallet =
+	'(@request.body.wallet:isset = false || @request.body.wallet.user = @request.auth.id)';
+
 const tenantCollectionRules = {
 	presets: {
-		listRule: '',
-		viewRule: '',
-		createRule: "@request.auth.id != ''",
-		updateRule: '@request.auth.id = user',
+		listRule: "user = '' || user = @request.auth.id",
+		viewRule: "user = '' || user = @request.auth.id",
+		createRule: ownerCreate,
+		updateRule: `@request.auth.id = user && ${keepsOwner}`,
 		deleteRule: '@request.auth.id = user'
 	},
 	wallets: {
 		listRule: '@request.auth.id = user.id',
 		viewRule: '@request.auth.id = user.id',
-		createRule: "@request.auth.id != ''",
-		updateRule: '@request.auth.id = user.id',
+		createRule: ownerCreate,
+		updateRule: `@request.auth.id = user.id && ${keepsOwner}`,
 		deleteRule: '@request.auth.id = user.id'
 	},
 	transactions: {
 		listRule: '@request.auth.id = wallet.user.id',
 		viewRule: '@request.auth.id = wallet.user.id',
 		createRule: '@request.auth.id = wallet.user.id',
-		updateRule: '@request.auth.id = wallet.user.id',
+		updateRule: `@request.auth.id = wallet.user.id && ${keepsWallet}`,
 		deleteRule: '@request.auth.id = wallet.user.id'
 	},
 	user_settings: {
 		listRule: '@request.auth.id = user.id',
 		viewRule: '@request.auth.id = user.id',
-		createRule: "@request.auth.id != ''",
-		updateRule: '@request.auth.id = user.id',
+		createRule: ownerCreate,
+		updateRule: `@request.auth.id = user.id && ${keepsOwner}`,
 		deleteRule: '@request.auth.id = user.id'
 	},
 	recurring_schedules: {
 		listRule: '@request.auth.id = wallet.user.id',
 		viewRule: '@request.auth.id = wallet.user.id',
 		createRule: '@request.auth.id = wallet.user.id',
-		updateRule: '@request.auth.id = wallet.user.id',
+		updateRule: `@request.auth.id = wallet.user.id && ${keepsWallet}`,
 		deleteRule: '@request.auth.id = wallet.user.id'
 	}
 };
