@@ -1,2 +1,97 @@
 @import 'tailwindcss';
 @plugin 'daisyui';
+
+@plugin 'daisyui/theme' {
+	name: 'light';
+	default: true;
+	color-scheme: light;
+	--color-base-100: oklch(100% 0 0);
+	--color-base-200: oklch(97.6% 0.004 265);
+	--color-base-300: oklch(92.8% 0.008 265);
+	--color-base-content: oklch(23% 0.025 265);
+	--color-primary: oklch(52% 0.2 274);
+	--color-primary-content: oklch(98% 0.01 274);
+	--color-secondary: oklch(62% 0.17 330);
+	--color-secondary-content: oklch(98% 0.01 330);
+	--color-accent: oklch(70% 0.14 190);
+	--color-accent-content: oklch(20% 0.03 190);
+	--color-neutral: oklch(30% 0.03 265);
+	--color-neutral-content: oklch(97% 0.005 265);
+	--color-info: oklch(62% 0.15 240);
+	--color-info-content: oklch(98% 0.01 240);
+	--color-success: oklch(58% 0.14 155);
+	--color-success-content: oklch(98% 0.02 155);
+	--color-warning: oklch(76% 0.16 70);
+	--color-warning-content: oklch(25% 0.05 70);
+	--color-error: oklch(58% 0.21 25);
+	--color-error-content: oklch(98% 0.01 25);
+	--radius-selector: 0.5rem;
+	--radius-field: 0.625rem;
+	--radius-box: 1rem;
+	--size-selector: 0.25rem;
+	--size-field: 0.25rem;
+	--border: 1px;
+	--depth: 0;
+	--noise: 0;
+}
+
+@plugin 'daisyui/theme' {
+	name: 'dark';
+	prefersdark: true;
+	color-scheme: dark;
+	--color-base-100: oklch(21.5% 0.014 268);
+	--color-base-200: oklch(17.5% 0.012 268);
+	--color-base-300: oklch(28% 0.016 268);
+	--color-base-content: oklch(93% 0.01 268);
+	--color-primary: oklch(68% 0.16 276);
+	--color-primary-content: oklch(16% 0.03 276);
+	--color-secondary: oklch(70% 0.16 330);
+	--color-secondary-content: oklch(16% 0.03 330);
+	--color-accent: oklch(76% 0.13 190);
+	--color-accent-content: oklch(18% 0.03 190);
+	--color-neutral: oklch(32% 0.02 268);
+	--color-neutral-content: oklch(94% 0.01 268);
+	--color-info: oklch(70% 0.13 240);
+	--color-info-content: oklch(16% 0.03 240);
+	--color-success: oklch(70% 0.15 155);
+	--color-success-content: oklch(16% 0.03 155);
+	--color-warning: oklch(80% 0.15 75);
+	--color-warning-content: oklch(20% 0.04 75);
+	--color-error: oklch(68% 0.19 25);
+	--color-error-content: oklch(16% 0.03 25);
+	--radius-selector: 0.5rem;
+	--radius-field: 0.625rem;
+	--radius-box: 1rem;
+	--size-selector: 0.25rem;
+	--size-field: 0.25rem;
+	--border: 1px;
+	--depth: 0;
+	--noise: 0;
+}
+
+@theme {
+	--font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+@layer base {
+	html {
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+		font-feature-settings: 'cv11', 'ss01';
+	}
+}
+
+@utility surface {
+	background-color: var(--color-base-100);
+	border: 1px solid color-mix(in oklab, var(--color-base-300) 70%, transparent);
+	border-radius: var(--radius-box);
+}
+
+@utility eyebrow {
+	font-size: 0.6875rem;
+	line-height: 1rem;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+}

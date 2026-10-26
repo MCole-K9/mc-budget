@@ -18,6 +18,11 @@
 	import { AI_PROVIDERS, PROVIDER_LABELS, PROVIDER_MODELS } from '$lib/settings';
 	import type { AiProvider } from '$lib/settings';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import Button from '$lib/components/Button.svelte';
+	import Alert from '$lib/components/Alert.svelte';
+	import Modal from '$lib/components/Modal.svelte';
+	import Icon, { type IconName } from '$lib/components/Icon.svelte';
 
 	const initial = await getAiSettings();
 	const [{ baseCurrency: initBase }, userAi, initialPendingAccounts, initialApprovedAccounts] =
@@ -218,199 +223,221 @@
 	<title>Settings - MC Budget</title>
 </svelte:head>
 
-<AuthGuard>
-	<div class="mx-auto max-w-3xl space-y-6">
-		<h1 class="text-2xl font-bold">Settings</h1>
-
+{#snippet sectionHeading(icon: IconName, title: string, description: string)}
+	<div class="mb-4 flex items-start gap-3">
+		<span class="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+			<Icon name={icon} class="size-[18px]" />
+		</span>
 		<div>
-			<h2 class="mb-3 text-xs font-semibold tracking-widest text-base-content/40 uppercase">
-				Financial Settings
-			</h2>
-			<p class="mb-4 text-sm text-base-content/50">
-				Base currency for unified totals in reports. Exchange rates fetched from open.er-api.com
-				(free, cached 1 hr).
-			</p>
-			<div class="flex max-w-xs items-center gap-2">
+			<h2 class="font-semibold">{title}</h2>
+			<p class="mt-0.5 text-sm text-base-content/55">{description}</p>
+		</div>
+	</div>
+{/snippet}
+
+{#snippet savedNote(text: string)}
+	<span class="flex items-center gap-1 text-xs font-medium text-success">
+		<Icon name="check" class="size-3.5" />
+		{text}
+	</span>
+{/snippet}
+
+{#snippet accountCell(account: ManagedAccount)}
+	<div class="flex items-center gap-3">
+		<span
+			class="grid size-8 shrink-0 place-items-center rounded-full bg-base-200 text-xs font-semibold"
+		>
+			{(account.name || account.email || '?').charAt(0).toUpperCase()}
+		</span>
+		<div class="min-w-0">
+			<div class="truncate font-medium">{account.name || 'Unnamed account'}</div>
+			<div class="truncate text-xs text-base-content/50">{account.email}</div>
+		</div>
+	</div>
+{/snippet}
+
+<AuthGuard>
+	<PageHeader title="Settings" subtitle="Currency, AI keys and who can use this instance." />
+
+	<div class="space-y-6">
+		<!-- Financial -->
+		<section class="surface p-5 sm:p-6">
+			{@render sectionHeading(
+				'globe',
+				'Base currency',
+				'Used to combine totals in reports. Exchange rates come from open.er-api.com (free, cached for 1 hour).'
+			)}
+			<div class="flex items-center gap-2">
 				<input
 					type="text"
 					maxlength="3"
-					class="input-bordered input input-sm w-20 uppercase"
+					class="input w-24 font-semibold tracking-widest uppercase"
+					aria-label="Base currency code"
 					bind:value={baseCurrencyInput}
 					oninput={() => (baseCurrencyInput = baseCurrencyInput.toUpperCase())}
 					onkeydown={(e) => e.key === 'Enter' && handleSaveBaseCurrency()}
 				/>
-				<button
-					class="btn btn-sm btn-primary"
-					disabled={baseCurrencyInput.length !== 3 || savingBase}
+				<Button
+					disabled={baseCurrencyInput.length !== 3}
+					loading={savingBase}
 					onclick={handleSaveBaseCurrency}
 				>
-					{#if savingBase}
-						<span class="loading loading-xs loading-spinner"></span>
-					{:else}
-						Save
-					{/if}
-				</button>
+					Save
+				</Button>
 				{#if baseSaved}
-					<span class="text-xs text-success">✓ Saved</span>
+					{@render savedNote('Saved')}
 				{/if}
 			</div>
-		</div>
+		</section>
 
-		<div>
-			<h2 class="mb-3 text-xs font-semibold tracking-widest text-base-content/40 uppercase">
-				Personal API Keys
-			</h2>
-			<p class="mb-4 text-sm text-base-content/50">
-				Your own keys override the shared system keys. Values are stored per-user, server-side, and
-				never sent to the browser.
-			</p>
+		<!-- Personal keys -->
+		<section class="surface p-5 sm:p-6">
+			{@render sectionHeading(
+				'key',
+				'Personal API keys',
+				'Your own keys override the shared system keys. They are stored per user on the server and never sent to the browser.'
+			)}
 
-			<div class="grid gap-4 md:grid-cols-3">
+			<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
 				{#each AI_PROVIDERS as provider (provider)}
 					{@const isSet = userConfigured[provider]}
 					{@const isSaving = userSaving === provider}
 					{@const isClearing = userClearing === provider}
 
-					<div class="flex flex-col gap-3 rounded-2xl bg-base-100 p-4 shadow-sm">
-						<div class="flex items-start justify-between">
-							<div>
-								<p class="font-semibold">{PROVIDER_LABELS[provider]}</p>
-								<p class="mt-0.5 text-xs text-base-content/40">Personal key</p>
-							</div>
+					<div class="flex flex-col gap-3 rounded-box border border-base-300/70 p-4">
+						<div class="flex items-start justify-between gap-2">
+							<p class="font-semibold">{PROVIDER_LABELS[provider]}</p>
 							{#if isSet}
-								<span class="badge badge-sm badge-success">Key set</span>
+								<span class="badge badge-soft badge-sm whitespace-nowrap badge-success">Key set</span>
 							{:else}
-								<span class="badge badge-ghost badge-sm">Using system</span>
+								<span class="badge badge-ghost badge-sm whitespace-nowrap">Using system</span>
 							{/if}
 						</div>
 
 						{#if userSaved === provider}
-							<p class="text-xs text-success">✓ Key saved</p>
+							{@render savedNote('Key saved')}
 						{/if}
 						{#if userErrors[provider]}
 							<p class="text-xs text-error">{userErrors[provider]}</p>
 						{/if}
 
-						<div class="flex gap-2">
+						<div class="mt-auto flex gap-2">
 							<input
 								type="password"
-								class="input-bordered input input-sm min-w-0 flex-1"
+								class="input input-sm min-w-0 flex-1"
 								placeholder={isSet ? 'Replace key…' : 'Paste key…'}
+								aria-label="{PROVIDER_LABELS[provider]} personal API key"
 								autocomplete="off"
 								bind:value={userKeys[provider]}
 								onkeydown={(e) => e.key === 'Enter' && handleSaveUserKey(provider)}
 							/>
-							<button
-								class="btn btn-sm btn-primary"
-								disabled={!userKeys[provider].trim() || isSaving}
+							<Button
+								size="sm"
+								disabled={!userKeys[provider].trim()}
+								loading={isSaving}
 								onclick={() => handleSaveUserKey(provider)}
 							>
-								{#if isSaving}
-									<span class="loading loading-xs loading-spinner"></span>
-								{:else}
-									Save
-								{/if}
-							</button>
+								Save
+							</Button>
 						</div>
 
 						{#if isSet}
-							<button
-								class="btn w-full text-error/70 btn-ghost btn-sm hover:text-error"
-								disabled={isClearing}
+							<Button
+								variant="ghost"
+								size="sm"
+								class="w-full text-error"
+								loading={isClearing}
 								onclick={() => handleClearUserKey(provider)}
 							>
-								{#if isClearing}
-									<span class="loading loading-xs loading-spinner"></span>
-								{:else}
-									Remove (use system key)
-								{/if}
-							</button>
+								Remove (use system key)
+							</Button>
 						{/if}
 					</div>
 				{/each}
 			</div>
-		</div>
+		</section>
 
 		{#if isAdmin}
-			<div>
-				<h2 class="mb-3 text-xs font-semibold tracking-widest text-base-content/40 uppercase">
-					Instance access
-				</h2>
-				<div class="flex items-center justify-between gap-4 rounded-2xl bg-base-100 p-4 shadow-sm">
-					<div>
-						<p class="font-medium">Private instance</p>
-						<p class="mt-1 text-sm text-base-content/50">
-							{#if isPrivateInstance}
-								Accounts require administrator approval before accessing MC Budget.
-							{:else}
-								Any authenticated account can access MC Budget.
-							{/if}
-						</p>
-					</div>
+			<div class="flex items-center gap-3 pt-4">
+				<span class="eyebrow">Administration</span>
+				<div class="h-px flex-1 bg-base-300/70"></div>
+			</div>
+
+			<!-- Instance access -->
+			<section class="surface p-5 sm:p-6">
+				<div class="flex items-start justify-between gap-4">
+					{@render sectionHeading(
+						'shield',
+						'Private instance',
+						isPrivateInstance
+							? 'Accounts need administrator approval before they can use MC Budget.'
+							: 'Any authenticated account can use MC Budget.'
+					)}
 					<input
 						type="checkbox"
-						class="toggle toggle-primary"
+						class="toggle mt-1 toggle-primary"
+						aria-label="Private instance"
 						checked={isPrivateInstance}
 						disabled={savingPrivateInstance}
 						onchange={handlePrivateInstanceChange}
 					/>
 				</div>
 				{#if privateInstanceError}
-					<p class="mt-2 text-sm text-error">{privateInstanceError}</p>
+					<p class="text-sm text-error">{privateInstanceError}</p>
 				{:else if privateInstanceSaved}
-					<p class="mt-2 text-sm text-success">✓ Instance access updated</p>
+					{@render savedNote('Instance access updated')}
 				{/if}
-			</div>
+			</section>
 
 			{#if isPrivateInstance}
-				<div>
-					<h2 class="mb-3 text-xs font-semibold tracking-widest text-base-content/40 uppercase">
-						Awaiting approval
-					</h2>
-					<p class="mb-4 text-sm text-base-content/50">
-						Only approved accounts can access MC Budget.
-					</p>
+				<!-- Accounts -->
+				<section class="surface p-5 sm:p-6">
+					{@render sectionHeading(
+						'users',
+						'Accounts',
+						'Only approved accounts can use MC Budget. Revoking access moves an account back to the queue without deleting its data.'
+					)}
 
 					{#if approvalError}
-						<p class="mb-3 text-sm text-error">{approvalError}</p>
+						<Alert type="error" class="mb-4">{approvalError}</Alert>
 					{/if}
 
+					<h3 class="mb-2 flex items-center gap-2 text-sm font-semibold">
+						Awaiting approval
+						{#if pendingAccounts.length > 0}
+							<span class="badge badge-soft badge-sm badge-warning">{pendingAccounts.length}</span>
+						{/if}
+					</h3>
 					{#if pendingAccounts.length === 0}
-						<div class="rounded-2xl bg-base-100 p-4 text-sm text-base-content/50 shadow-sm">
+						<p class="mb-6 rounded-field bg-base-200/60 px-4 py-3 text-sm text-base-content/55">
 							No accounts are awaiting approval.
-						</div>
+						</p>
 					{:else}
-						<div class="overflow-x-auto rounded-2xl bg-base-100 shadow-sm">
+						<div class="mb-6 overflow-x-auto rounded-box border border-base-300/70">
 							<table class="table">
 								<thead>
 									<tr>
 										<th>Account</th>
 										<th>Requested</th>
-										<th class="text-right">Action</th>
+										<th class="text-right"><span class="sr-only">Action</span></th>
 									</tr>
 								</thead>
 								<tbody>
 									{#each pendingAccounts as account (account.id)}
 										<tr>
-											<td>
-												<div class="font-medium">{account.name || 'Unnamed account'}</div>
-												<div class="text-sm text-base-content/50">{account.email}</div>
-											</td>
-											<td class="text-sm whitespace-nowrap text-base-content/50">
+											<td>{@render accountCell(account)}</td>
+											<td class="text-sm whitespace-nowrap text-base-content/55">
 												{new Date(account.created).toLocaleDateString()}
 											</td>
 											<td class="text-right">
-												<button
-													class="btn btn-sm btn-primary"
-													disabled={approvingAccountId === account.id}
+												<Button
+													size="sm"
+													icon="check"
+													loading={approvingAccountId === account.id}
 													onclick={() => handleApproveAccount(account.id)}
 												>
-													{#if approvingAccountId === account.id}
-														<span class="loading loading-xs loading-spinner"></span>
-													{:else}
-														Approve
-													{/if}
-												</button>
+													Approve
+												</Button>
 											</td>
 										</tr>
 									{/each}
@@ -418,48 +445,39 @@
 							</table>
 						</div>
 					{/if}
-				</div>
 
-				<div>
-					<h2 class="mb-3 text-xs font-semibold tracking-widest text-base-content/40 uppercase">
-						Authorized accounts
-					</h2>
-					<p class="mb-4 text-sm text-base-content/50">
-						Revoking access moves an account back to the approval queue without deleting its data.
-					</p>
-
+					<h3 class="mb-2 text-sm font-semibold">Authorized</h3>
 					{#if approvedAccounts.length === 0}
-						<div class="rounded-2xl bg-base-100 p-4 text-sm text-base-content/50 shadow-sm">
+						<p class="rounded-field bg-base-200/60 px-4 py-3 text-sm text-base-content/55">
 							No non-admin accounts are currently authorized.
-						</div>
+						</p>
 					{:else}
-						<div class="overflow-x-auto rounded-2xl bg-base-100 shadow-sm">
+						<div class="overflow-x-auto rounded-box border border-base-300/70">
 							<table class="table">
 								<thead>
 									<tr>
 										<th>Account</th>
 										<th>Joined</th>
-										<th class="text-right">Action</th>
+										<th class="text-right"><span class="sr-only">Action</span></th>
 									</tr>
 								</thead>
 								<tbody>
 									{#each approvedAccounts as account (account.id)}
 										<tr>
-											<td>
-												<div class="font-medium">{account.name || 'Unnamed account'}</div>
-												<div class="text-sm text-base-content/50">{account.email}</div>
-											</td>
-											<td class="text-sm whitespace-nowrap text-base-content/50">
+											<td>{@render accountCell(account)}</td>
+											<td class="text-sm whitespace-nowrap text-base-content/55">
 												{new Date(account.created).toLocaleDateString()}
 											</td>
 											<td class="text-right">
-												<button
-													class="btn btn-sm btn-error"
+												<Button
+													size="sm"
+													variant="ghost"
+													class="text-error"
 													disabled={revokingAccountId === account.id}
 													onclick={() => (accountToRevoke = account)}
 												>
-													Revoke access
-												</button>
+													Revoke
+												</Button>
 											</td>
 										</tr>
 									{/each}
@@ -467,18 +485,18 @@
 							</table>
 						</div>
 					{/if}
-				</div>
+				</section>
 			{/if}
 
-			<div>
-				<h2 class="mb-3 text-xs font-semibold tracking-widest text-base-content/40 uppercase">
-					AI Provider
-				</h2>
-				<p class="mb-4 text-sm text-base-content/50">
-					Used for receipt scanning. Keys are stored server-side and never sent to the browser.
-				</p>
+			<!-- AI provider -->
+			<section class="surface p-5 sm:p-6">
+				{@render sectionHeading(
+					'sparkles',
+					'AI provider',
+					'Shared system keys used for receipt scanning. Keys are stored on the server and never sent to the browser.'
+				)}
 
-				<div class="grid gap-4 md:grid-cols-3">
+				<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
 					{#each AI_PROVIDERS as provider (provider)}
 						{@const isActive = activeProvider === provider}
 						{@const isConfigured = configured[provider]}
@@ -486,22 +504,24 @@
 						{@const isActivating = activating === provider}
 
 						<div
-							class="flex flex-col gap-3 rounded-2xl bg-base-100 p-4 shadow-sm {isActive
-								? 'ring-2 ring-primary'
-								: ''}"
+							class={[
+								'flex flex-col gap-3 rounded-box border p-4',
+								isActive ? 'border-primary ring-2 ring-primary/15' : 'border-base-300/70'
+							]}
 						>
-							<!-- Header -->
-							<div class="flex items-start justify-between">
-								<div>
+							<div class="flex items-start justify-between gap-2">
+								<div class="min-w-0">
 									<p class="font-semibold">{PROVIDER_LABELS[provider]}</p>
-									<p class="mt-0.5 text-xs text-base-content/40">{PROVIDER_MODELS[provider]}</p>
+									<p class="mt-0.5 truncate text-xs text-base-content/50">
+										{PROVIDER_MODELS[provider]}
+									</p>
 								</div>
 								<div class="flex flex-col items-end gap-1">
 									{#if isActive}
 										<span class="badge badge-sm badge-primary">Active</span>
 									{/if}
 									{#if isConfigured}
-										<span class="badge badge-sm badge-success">Key set</span>
+										<span class="badge badge-soft badge-sm whitespace-nowrap badge-success">Key set</span>
 									{:else}
 										<span class="badge badge-ghost badge-sm">No key</span>
 									{/if}
@@ -509,92 +529,72 @@
 							</div>
 
 							{#if saved === provider}
-								<p class="text-xs text-success">✓ Key saved</p>
+								{@render savedNote('Key saved')}
 							{/if}
 							{#if errors[provider]}
 								<p class="text-xs text-error">{errors[provider]}</p>
 							{/if}
 
-							<!-- Key input -->
-							<div class="flex gap-2">
+							<div class="mt-auto flex gap-2">
 								<input
 									type="password"
-									class="input-bordered input input-sm min-w-0 flex-1"
+									class="input input-sm min-w-0 flex-1"
 									placeholder={isConfigured ? 'Replace key…' : 'Paste key…'}
+									aria-label="{PROVIDER_LABELS[provider]} system API key"
 									autocomplete="off"
 									bind:value={keys[provider]}
 									onkeydown={(e) => e.key === 'Enter' && handleSaveKey(provider)}
 								/>
-								<button
-									class="btn btn-sm btn-primary"
-									disabled={!keys[provider].trim() || isSaving}
+								<Button
+									size="sm"
+									disabled={!keys[provider].trim()}
+									loading={isSaving}
 									onclick={() => handleSaveKey(provider)}
 								>
-									{#if isSaving}
-										<span class="loading loading-xs loading-spinner"></span>
-									{:else}
-										Save
-									{/if}
-								</button>
+									Save
+								</Button>
 							</div>
 
-							<!-- Set active -->
 							{#if !isActive && isConfigured}
-								<button
-									class="btn w-full btn-ghost btn-sm"
-									disabled={isActivating}
+								<Button
+									variant="soft"
+									size="sm"
+									class="w-full"
+									loading={isActivating}
 									onclick={() => handleSetActive(provider)}
 								>
-									{#if isActivating}
-										<span class="loading loading-xs loading-spinner"></span>
-									{:else}
-										Use this provider
-									{/if}
-								</button>
+									Use this provider
+								</Button>
 							{/if}
 						</div>
 					{/each}
 				</div>
-			</div>
+			</section>
 		{/if}
 	</div>
 </AuthGuard>
 
-{#if accountToRevoke}
-	<div class="modal-open modal" role="presentation">
-		<div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="revoke-account-title">
-			<h2 id="revoke-account-title" class="text-lg font-bold">Revoke account access?</h2>
-			<p class="mt-2 text-sm text-base-content/70">
-				{accountToRevoke.name || accountToRevoke.email} will lose access immediately. Their data will
-				be kept and the account can be approved again later.
-			</p>
-			<div class="modal-action">
-				<button
-					class="btn btn-ghost"
-					disabled={revokingAccountId === accountToRevoke.id}
-					onclick={() => (accountToRevoke = null)}
-				>
-					Cancel
-				</button>
-				<button
-					class="btn btn-error"
-					disabled={revokingAccountId === accountToRevoke.id}
-					onclick={handleRevokeAccount}
-				>
-					{#if revokingAccountId === accountToRevoke.id}
-						<span class="loading loading-xs loading-spinner"></span>
-					{:else}
-						Revoke access
-					{/if}
-				</button>
-			</div>
-		</div>
-		<button
-			class="modal-backdrop"
-			aria-label="Close confirmation"
+<Modal
+	open={!!accountToRevoke}
+	title="Revoke account access?"
+	onclose={() => {
+		if (!revokingAccountId) accountToRevoke = null;
+	}}
+>
+	<p class="text-sm text-base-content/70">
+		{accountToRevoke?.name || accountToRevoke?.email} will lose access immediately. Their data will be
+		kept and the account can be approved again later.
+	</p>
+	{#snippet actions()}
+		<Button
+			variant="ghost"
+			disabled={!!revokingAccountId}
 			onclick={() => (accountToRevoke = null)}
 		>
-			Close
-		</button>
-	</div>
-{/if}
+			Cancel
+		</Button>
+		<Button variant="error" loading={!!revokingAccountId} onclick={handleRevokeAccount}>
+			Revoke access
+		</Button>
+	{/snippet}
+</Modal>

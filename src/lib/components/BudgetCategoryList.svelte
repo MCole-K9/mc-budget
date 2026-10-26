@@ -2,6 +2,7 @@
 	import type { BudgetCategory } from '$lib/types/budget';
 	import { calculateCategoryTotal, validateCategories } from '$lib/validation/budget';
 	import BudgetCategoryInput from './BudgetCategoryInput.svelte';
+	import Icon from './Icon.svelte';
 
 	interface Props {
 		categories: BudgetCategory[];
@@ -10,7 +11,12 @@
 		onchange?: (categories: BudgetCategory[]) => void;
 	}
 
-	let { categories = $bindable(), editable = true, budgetType = 'percentage', onchange }: Props = $props();
+	let {
+		categories = $bindable(),
+		editable = true,
+		budgetType = 'percentage',
+		onchange
+	}: Props = $props();
 
 	const total = $derived(calculateCategoryTotal(categories));
 	const isValid = $derived(validateCategories(categories, budgetType).valid);
@@ -46,7 +52,7 @@
 	}
 </script>
 
-<div class="space-y-3">
+<div class="space-y-2">
 	{#each categories as category, index (index)}
 		<BudgetCategoryInput
 			bind:category={categories[index]}
@@ -57,21 +63,40 @@
 	{/each}
 
 	{#if editable}
-		<button type="button" class="btn btn-sm btn-ghost w-full" onclick={addCategory}>
-			+ Add Category
+		<button
+			type="button"
+			class="btn w-full border-dashed border-base-300 btn-ghost btn-sm"
+			onclick={addCategory}
+		>
+			<Icon name="plus" class="size-4" />
+			Add category
 		</button>
 	{/if}
 
 	{#if budgetType !== 'fixed'}
-		<div
-			class={['flex justify-between items-center p-2 rounded-lg', isValid ? 'bg-success/10 text-success' : 'bg-error/10 text-error']}
-		>
-			<span class="font-medium">Total:</span>
-			<span class="font-bold">{total.toFixed(1)}%</span>
+		<div class="pt-2">
+			<div class="mb-1.5 flex items-center justify-between text-sm">
+				<span class="text-base-content/60">Allocated</span>
+				<span class={['font-semibold tabular-nums', isValid ? 'text-success' : 'text-error']}>
+					{total.toFixed(1)}% of 100%
+				</span>
+			</div>
+			<div class="flex h-2 gap-0.5 overflow-hidden rounded-full bg-base-200">
+				{#each categories as category, i (i)}
+					<div
+						class="h-full transition-all"
+						style:width="{Math.max(0, category.percentage)}%"
+						style:background-color={category.color}
+					></div>
+				{/each}
+			</div>
+			{#if !isValid}
+				<p class="mt-2 text-xs text-error">
+					{total > 100
+						? `Over by ${(total - 100).toFixed(1)}% — categories must total exactly 100%`
+						: `${(100 - total).toFixed(1)}% left to allocate — categories must total exactly 100%`}
+				</p>
+			{/if}
 		</div>
-
-		{#if !isValid}
-			<p class="text-sm text-error">Categories must total exactly 100%</p>
-		{/if}
 	{/if}
 </div>

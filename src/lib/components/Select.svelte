@@ -5,7 +5,7 @@
 	interface Props extends HTMLSelectAttributes {
 		label?: string;
 		error?: string;
-		options?: { value: string; label: string }[];
+		options?: readonly { value: string; label: string }[];
 		children?: Snippet;
 		class?: ClassValue;
 	}
@@ -21,17 +21,11 @@
 	}: Props = $props();
 </script>
 
-<div class="form-control w-full">
+<label class="flex w-full flex-col gap-1.5">
 	{#if label}
-		<div class="label">
-			<span class="label-text">{label}</span>
-		</div>
+		<span class="text-sm font-medium text-base-content/80">{label}</span>
 	{/if}
-	<select
-		class={['select select-bordered w-full', error && 'select-error', className]}
-		bind:value
-		{...rest}
-	>
+	<select class={['select w-full', error && 'select-error', className]} bind:value {...rest}>
 		{#if children}
 			{@render children()}
 		{:else}
@@ -41,8 +35,6 @@
 		{/if}
 	</select>
 	{#if error}
-		<div class="label">
-			<span class="label-text-alt text-error">{error}</span>
-		</div>
+		<span class="text-xs text-error">{error}</span>
 	{/if}
-</div>
+</label>

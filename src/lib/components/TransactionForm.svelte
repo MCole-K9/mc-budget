@@ -7,6 +7,9 @@
 	import Select from './Select.svelte';
 	import Input from './Input.svelte';
 	import Button from './Button.svelte';
+	import Alert from './Alert.svelte';
+	import Icon from './Icon.svelte';
+	import ExpenseIncomeToggle from './ExpenseIncomeToggle.svelte';
 
 	interface Props {
 		wallet: Wallet;
@@ -104,57 +107,26 @@
 	<input type="hidden" name="recurring" value={String(isRecurring)} />
 
 	{#each createTransaction.fields.allIssues() as issue (issue.message)}
-		<div class="alert alert-error py-2 text-sm">{issue.message}</div>
+		<Alert type="error">{issue.message}</Alert>
 	{/each}
 
-	<!-- Receipt upload + scan -->
-	<div class="form-control">
-		<div class="label">
-			<span class="label-text">Receipt</span>
-		</div>
-		<input
-			{...createTransaction.fields.receipt.as('file')}
-			accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
-			class="file-input file-input-bordered w-full"
-			oninput={handleReceiptFile}
-		/>
-		{#if scanError}
-			<div class="label">
-				<span class="label-text-alt text-error">{scanError}</span>
-			</div>
-		{:else if selectedFile}
-			<div class="label">
-				{#if scanLoading}
-					<span class="label-text-alt flex items-center gap-1 text-base-content/50">
-						<span class="loading loading-spinner loading-xs"></span> Scanning…
-					</span>
-				{:else if scanned}
-					<span class="label-text-alt text-success">✓ Receipt scanned</span>
-				{:else}
-					<button type="button" class="btn btn-xs btn-ghost" onclick={handleScan}>
-						Scan with AI
-					</button>
-				{/if}
-			</div>
-		{/if}
-	</div>
+	<ExpenseIncomeToggle bind:isExpense />
 
-	<div class="flex gap-2">
-		<button
-			type="button"
-			class="btn flex-1 {isExpense ? 'btn-error' : 'btn-ghost'}"
-			onclick={() => (isExpense = true)}
-		>
-			Expense
-		</button>
-		<button
-			type="button"
-			class="btn flex-1 {!isExpense ? 'btn-success' : 'btn-ghost'}"
-			onclick={() => (isExpense = false)}
-		>
-			Income
-		</button>
-	</div>
+	<label class="flex flex-col gap-1.5">
+		<span class="text-sm font-medium text-base-content/80">Amount</span>
+		<span class="input input-lg w-full">
+			<span class="text-base-content/40">{wallet.currency}</span>
+			<input
+				{...createTransaction.fields.amount.as('number')}
+				placeholder="0.00"
+				min="0.01"
+				step="0.01"
+				required
+				class="text-xl font-semibold tabular-nums"
+				bind:value={amount}
+			/>
+		</span>
+	</label>
 
 	{#if isExpense}
 		<Select
@@ -168,48 +140,84 @@
 		<Input
 			type="text"
 			name="incomeSource"
-			label="Income Source (optional)"
+			label="Income source (optional)"
 			placeholder="e.g. Salary, Freelance"
 		/>
 	{/if}
 
-	<Input
-		{...createTransaction.fields.amount.as('number')}
-		label="Amount"
-		placeholder="0.00"
-		min="0.01"
-		step="0.01"
-		required
-		bind:value={amount}
-	/>
+	<div class="grid gap-4 sm:grid-cols-[1fr_auto]">
+		<Input
+			{...createTransaction.fields.description.as('text')}
+			label="Description (optional)"
+			placeholder="What was this for?"
+			bind:value={description}
+		/>
 
-	<Input
-		{...createTransaction.fields.description.as('text')}
-		label="Description (optional)"
-		placeholder="What was this for?"
-		bind:value={description}
-	/>
+		<Input
+			{...createTransaction.fields.date.as('date')}
+			label="Date"
+			required
+			bind:value={date}
+		/>
+	</div>
 
-	<Input
-		{...createTransaction.fields.date.as('date')}
-		label="Date"
-		required
-		bind:value={date}
-	/>
+	<!-- Receipt upload + scan -->
+	<div class="rounded-box border border-dashed border-base-300 p-3">
+		<div class="flex items-center justify-between gap-2">
+			<span class="flex items-center gap-2 text-sm font-medium text-base-content/80">
+				<Icon name="receipt" class="size-4 text-base-content/50" />
+				Receipt <span class="font-normal text-base-content/45">(optional)</span>
+			</span>
+			{#if selectedFile}
+				{#if scanLoading}
+					<span class="flex items-center gap-1.5 text-xs text-base-content/55">
+						<span class="loading loading-xs loading-spinner"></span> Scanning…
+					</span>
+				{:else if scanned}
+					<span class="flex items-center gap-1 text-xs font-medium text-success">
+						<Icon name="check" class="size-3.5" /> Details filled in
+					</span>
+				{:else}
+					<button type="button" class="btn btn-soft btn-xs btn-primary" onclick={handleScan}>
+						<Icon name="sparkles" class="size-3.5" />
+						Scan with AI
+					</button>
+				{/if}
+			{/if}
+		</div>
+		<input
+			{...createTransaction.fields.receipt.as('file')}
+			accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+			class="file-input mt-2 w-full file-input-sm"
+			aria-label="Receipt file"
+			oninput={handleReceiptFile}
+		/>
+		{#if scanError}
+			<p class="mt-2 text-xs text-error">{scanError}</p>
+		{:else if !selectedFile}
+			<p class="mt-2 text-xs text-base-content/45">
+				Attach a photo and AI can fill in the amount, date and category.
+			</p>
+		{/if}
+	</div>
 
 	<!-- Recurring -->
-	<div class="space-y-2">
-		<label class="flex items-center gap-3 cursor-pointer">
-			<input type="checkbox" class="checkbox checkbox-sm" bind:checked={isRecurring} />
-			<span class="label-text">Repeat monthly</span>
+	<div class="rounded-box bg-base-200/60 p-3">
+		<label class="flex cursor-pointer items-center justify-between gap-3">
+			<span class="flex items-center gap-2 text-sm font-medium">
+				<Icon name="repeat" class="size-4 text-base-content/50" />
+				Repeat monthly
+			</span>
+			<input type="checkbox" class="toggle toggle-sm toggle-primary" bind:checked={isRecurring} />
 		</label>
 
 		{#if isRecurring}
-			<div class="flex items-center gap-2 pl-7">
-				<span class="text-sm text-base-content/70">on day</span>
+			<div class="mt-3 flex items-center gap-2 text-sm text-base-content/70">
+				<span>On day</span>
 				<select
 					name="n:recur_day"
-					class="select select-bordered select-sm w-20"
+					class="select w-20 select-sm"
+					aria-label="Day of month"
 					value={String(recurDay)}
 					onchange={(e) => (recurDay = Number(e.currentTarget.value))}
 				>
@@ -217,12 +225,12 @@
 						<option value={opt.value}>{opt.label}</option>
 					{/each}
 				</select>
-				<span class="text-sm text-base-content/70">of each month</span>
+				<span>of each month</span>
 			</div>
 		{/if}
 	</div>
 
 	<Button type="submit" variant="primary" class="w-full" loading={!!createTransaction.pending}>
-		Add Transaction
+		Add transaction
 	</Button>
 </form>

@@ -5,6 +5,8 @@
 	import Select from './Select.svelte';
 	import Input from './Input.svelte';
 	import Button from './Button.svelte';
+	import Alert from './Alert.svelte';
+	import ExpenseIncomeToggle from './ExpenseIncomeToggle.svelte';
 
 	interface Props {
 		transaction: Transaction;
@@ -59,25 +61,10 @@
 
 <form onsubmit={handleSubmit} class="space-y-4">
 	{#if error}
-		<div class="alert alert-error py-2 text-sm">{error}</div>
+		<Alert type="error">{error}</Alert>
 	{/if}
 
-	<div class="flex gap-2">
-		<button
-			type="button"
-			class="btn flex-1 {isExpense ? 'btn-error' : 'btn-ghost'}"
-			onclick={() => (isExpense = true)}
-		>
-			Expense
-		</button>
-		<button
-			type="button"
-			class="btn flex-1 {!isExpense ? 'btn-success' : 'btn-ghost'}"
-			onclick={() => (isExpense = false)}
-		>
-			Income
-		</button>
-	</div>
+	<ExpenseIncomeToggle bind:isExpense />
 
 	{#if isExpense}
 		<Select
@@ -91,7 +78,7 @@
 		<Input
 			type="text"
 			name="incomeSource"
-			label="Income Source (optional)"
+			label="Income source (optional)"
 			placeholder="e.g. Salary, Freelance"
 			bind:value={incomeSource}
 		/>
@@ -124,12 +111,12 @@
 		bind:value={date}
 	/>
 
-	<div class="flex gap-2">
+	<div class="flex gap-2 pt-2">
 		{#if onCancel}
 			<Button type="button" variant="ghost" class="flex-1" onclick={onCancel}>Cancel</Button>
 		{/if}
 		<Button type="submit" variant="primary" class="flex-1" loading={submitting}>
-			Save Changes
+			Save changes
 		</Button>
 	</div>
 </form>

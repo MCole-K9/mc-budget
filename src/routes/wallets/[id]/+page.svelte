@@ -21,6 +21,11 @@
 	import EditTransactionForm from '$lib/components/EditTransactionForm.svelte';
 	import TransferForm from '$lib/components/TransferForm.svelte';
 	import CoverOverageForm from '$lib/components/CoverOverageForm.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import PeriodFilter from '$lib/components/PeriodFilter.svelte';
+	import Pagination from '$lib/components/Pagination.svelte';
+	import Icon from '$lib/components/Icon.svelte';
+	import { formatCurrency } from '$lib/utils/format';
 	import { getCategoryBudgetsForDate, removeBudgetCover } from '$lib/budgetCovers.remote';
 	import { getStandardPeriodRange, getPayCycleRange, getPayCycleOffsetForDate, todayYmd, formatShortDate, isDateInRange } from '$lib/utils/dateRange';
 	import { getEffectiveIncome, getCategoryBudgets, OVERAGE_EPSILON, type CategoryBudget } from '$lib/utils/budget';
@@ -292,10 +297,6 @@
 		}
 	}
 
-	function formatCurrency(amount: number, currency: string): string {
-		return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
-	}
-
 	const periodLabel = $derived(
 		BUILTIN_PERIODS.find((p) => p.value === selectedPeriod)?.label ?? selectedPeriod
 	);
@@ -305,6 +306,27 @@
 
 	// Allocated / spent / remaining per category, in wallet.categories order, including covers
 	const categoryBudgets = $derived(getCategoryBudgets(wallet, summary, effectivePeriodIncome));
+	const totalSpent = $derived(categoryBudgets.reduce((s, b) => s + b.spent, 0));
+	const totalAllocated = $derived(categoryBudgets.reduce((s, b) => s + b.allocated, 0));
+
+	// Width of each category in the allocation bar; fixed wallets use their share of the total limit
+	const allocationShares = $derived.by(() => {
+		if (wallet.budget_type !== 'fixed') return wallet.categories.map((c) => c.percentage);
+		const total = wallet.categories.reduce((s, c) => s + (c.fixedAmount ?? 0), 0);
+		return wallet.categories.map((c) => (total > 0 ? ((c.fixedAmount ?? 0) / total) * 100 : 0));
+	});
+
+	// The period this wallet opens on, after falling back from a stale or deleted default
+	const effectiveDefaultPeriod = $derived(resolveInitialPeriod(wallet).period);
+	const isDefaultPeriod = $derived(effectiveDefaultPeriod === selectedPeriod);
+
+	// A complete custom range can be saved under a name
+	const canSaveRange = $derived(showDateInputs && !!customStartDate && !!customEndDate);
+
+	// Saved ranges are chosen from their own chips, so no built-in tab is selected for them
+	const builtinSelection = $derived(
+		RESERVED_PERIOD_VALUES.has(selectedPeriod) ? selectedPeriod : ''
+	);
 
 	type CoverRequest = {
 		category: string;
@@ -395,535 +417,656 @@
 </svelte:head>
 
 <AuthGuard>
-	<div class="max-w-4xl mx-auto space-y-6">
+	<div class="space-y-6">
 		{#if error}
 			<Alert type="error" dismissible ondismiss={() => (error = '')}>{error}</Alert>
-			{/if}
+		{/if}
 
-			<!-- Header -->
-			<div>
-				<a href={resolve('/wallets')} class="btn btn-ghost btn-sm mb-3 -ml-3">&larr; Wallets</a>
-				<div class="flex justify-between items-end">
-					<div>
-						<div class="flex items-center gap-2">
-							<h1 class="text-2xl font-bold">{wallet.name}</h1>
-							{#if wallet.archived}
-								<span class="badge badge-ghost text-xs">Archived</span>
+		<!-- Header -->
+		<div>
+			<PageHeader title={wallet.name} backHref={resolve('/wallets')} backLabel="Wallets">
+				{#snippet badge()}
+					{#if wallet.archived}
+						<span class="badge badge-ghost badge-sm">
+							<Icon name="archive" class="size-3" /> Archived
+						</span>
+					{/if}
+				{/snippet}
+				{#snippet actions()}
+					<Button size="sm" icon="plus" onclick={() => (showAddTransaction = true)}>
+						Add transaction
+					</Button>
+					<Button size="sm" variant="soft" icon="transfer" onclick={() => (showTransfer = true)}>
+						Transfer
+					</Button>
+					<div class="dropdown dropdown-end">
+						<button
+							tabindex="0"
+							class="btn btn-square btn-ghost btn-sm"
+							title="Wallet options"
+							aria-label="Wallet options"
+						>
+							<Icon name="more" class="size-5" />
+						</button>
+						<ul
+							class="dropdown-content menu z-20 mt-1 w-56 rounded-box border border-base-300/70 bg-base-100 p-1.5 shadow-xl"
+						>
+							<li>
+								<button
+									onclick={() => (showResetBalanceConfirm = true)}
+									disabled={wallet.balance === 0}
+								>
+									<Icon name="scale" class="size-4" />
+									Reset balance to {formatCurrency(0, wallet.currency)}
+								</button>
+							</li>
+							{#if pagedResult.totalItems > 0}
+								<li>
+									<button onclick={exportCsv}>
+										<Icon name="download" class="size-4" />
+										Export period as CSV
+									</button>
+								</li>
 							{/if}
-						</div>
-						<div class="flex items-baseline gap-2 mt-1">
-							<p class="text-3xl font-bold text-primary tabular-nums">
-								{formatCurrency(wallet.balance, wallet.currency)}
-							</p>
-							<button
-								class="text-base text-base-content/30 hover:text-base-content/60 transition-colors"
-								onclick={handleRecalculate}
-								disabled={reconciling}
-								title="Recalculate balance from transaction history"
-							>
-								{reconciling ? '…' : '↺'}
-							</button>
-						</div>
-					</div>
-					<div class="flex gap-2">
-						<Button variant="primary" size="sm" onclick={() => (showAddTransaction = true)}>
-							+ Add
-						</Button>
-						<Button variant="ghost" size="sm" onclick={() => (showTransfer = true)}>
-							⇄ Transfer
-						</Button>
-						<div class="dropdown dropdown-end">
-							<button tabindex="0" class="btn btn-ghost btn-sm btn-square" title="Wallet settings">
-								⚙
-							</button>
-							<ul class="dropdown-content menu bg-base-100 rounded-box shadow-lg border border-base-200 w-48 p-1 z-10">
+							{#if wallet.archived}
 								<li>
-									<button
-										onclick={() => (showResetBalanceConfirm = true)}
-										disabled={wallet.balance === 0}
-									>
-										Reset balance to $0
+									<button onclick={handleUnarchiveWallet} disabled={archiving}>
+										<Icon name="archive" class="size-4" />
+										{archiving ? 'Unarchiving…' : 'Unarchive wallet'}
 									</button>
 								</li>
-								{#if wallet.archived}
-									<li>
-										<button onclick={handleUnarchiveWallet} disabled={archiving}>
-											{archiving ? 'Unarchiving…' : 'Unarchive wallet'}
-										</button>
-									</li>
-								{:else}
-									<li>
-										<button onclick={handleArchiveWallet} disabled={archiving}>
-											{archiving ? 'Archiving…' : 'Archive wallet'}
-										</button>
-									</li>
-								{/if}
+							{:else}
 								<li>
-									<button class="text-error" onclick={() => (showDeleteConfirm = true)}>
-										Delete wallet
+									<button onclick={handleArchiveWallet} disabled={archiving}>
+										<Icon name="archive" class="size-4" />
+										{archiving ? 'Archiving…' : 'Archive wallet'}
 									</button>
 								</li>
-							</ul>
-						</div>
+							{/if}
+							<li class="mt-1 border-t border-base-300/70 pt-1">
+								<button class="text-error" onclick={() => (showDeleteConfirm = true)}>
+									<Icon name="trash" class="size-4" />
+									Delete wallet
+								</button>
+							</li>
+						</ul>
 					</div>
+				{/snippet}
+			</PageHeader>
+
+			<!-- Balance and period totals -->
+			<div class="-mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+				<div class="surface col-span-2 p-5 sm:col-span-1">
+					<div class="flex items-center justify-between">
+						<p class="eyebrow">Balance</p>
+						<button
+							class="btn btn-square text-base-content/45 btn-ghost btn-xs hover:text-base-content"
+							onclick={handleRecalculate}
+							disabled={reconciling}
+							title="Recalculate balance from transaction history"
+							aria-label="Recalculate balance"
+						>
+							<Icon name="refresh" class={['size-3.5', reconciling && 'animate-spin']} />
+						</button>
+					</div>
+					<p class="mt-1 text-3xl font-bold tracking-tight tabular-nums">
+						{formatCurrency(wallet.balance, wallet.currency)}
+					</p>
+					<p class="mt-1 text-xs text-base-content/50">
+						{wallet.currency} · {wallet.budget_type === 'fixed' ? 'Fixed limits' : '% of income'}
+					</p>
+				</div>
+				{#if wallet.budget_type !== 'fixed'}
+					<div class="surface p-4 sm:p-5">
+						<p class="eyebrow">Income · {periodLabel}</p>
+						<p class="mt-1 text-xl font-semibold tracking-tight text-success tabular-nums sm:text-2xl">
+							{formatCurrency(effectivePeriodIncome, wallet.currency)}
+						</p>
+						<p class="mt-1 text-xs text-base-content/50">Available to allocate</p>
+					</div>
+				{/if}
+				<div class={['surface p-4 sm:p-5', wallet.budget_type === 'fixed' && 'col-span-2']}>
+					<p class="eyebrow">Spent · {periodLabel}</p>
+					<p
+						class={[
+							'mt-1 text-xl font-semibold tracking-tight tabular-nums sm:text-2xl',
+							totalSpent > 0 && 'text-error'
+						]}
+					>
+						{formatCurrency(totalSpent, wallet.currency)}
+					</p>
+					<p class="mt-1 text-xs text-base-content/50">
+						of {formatCurrency(totalAllocated, wallet.currency)} budgeted
+					</p>
 				</div>
 			</div>
-
-			<!-- Budget Allocation -->
-			<Card title="Budget Allocation">
-					<!-- Period income summary (percentage wallets only) -->
-					{#if wallet.budget_type !== 'fixed'}
-						<div class="flex justify-between items-center mb-5 pb-4 border-b border-base-200">
-							<span class="text-xs font-medium text-base-content/40 uppercase tracking-wider">Income · {periodLabel}</span>
-							<span class="text-sm font-semibold">{formatCurrency(effectivePeriodIncome, wallet.currency)}</span>
-						</div>
-						{#if effectivePeriodIncome === 0 && selectedPeriod !== 'all-time'}
-							<div class="text-xs text-base-content/40 text-center py-2">
-								No income this period. Switch to All Time to see full allocation.
-							</div>
-						{/if}
-					{:else}
-						<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-5 pb-4 border-b border-base-200">Fixed monthly limits</p>
-					{/if}
-					<div class="space-y-4">
-						{#each wallet.categories as category, i (category.name)}
-							{@const budget = categoryBudgets[i]}
-							{@const allocated = budget.allocated}
-							{@const spent = budget.spent}
-							{@const remaining = budget.remaining}
-							{@const covers = summary.covers.filter((c) => c.category.toLowerCase() === category.name.toLowerCase())}
-							{@const spentPct = allocated > 0 ? Math.min(100, (spent / allocated) * 100) : 0}
-							{@const overBudget = remaining < 0}
-							<div class="space-y-1">
-								<div class="flex items-center justify-between">
-									<div class="flex items-center gap-2">
-										<label
-											class="w-4 h-4 rounded cursor-pointer shrink-0"
-											style="background-color: {category.color};"
-											title="Change color"
-										>
-											<input
-												type="color"
-												value={category.color}
-												class="sr-only"
-												onchange={(e) => updateCategoryColor({ id: wallet.id, categoryName: category.name, color: e.currentTarget.value })}
-											/>
-										</label>
-										<span class="font-medium">{category.name}</span>
-										{#if wallet.budget_type !== "fixed"}<span class="text-base-content/60">{category.percentage}%</span>{/if}
-										{#if overBudget}
-											<span class="badge badge-error badge-sm">Over budget</span>
-											{#if wallet.budget_type === 'percentage'}
-												<button
-													class="btn btn-ghost btn-xs"
-													onclick={() => coverFromSelectedPeriod(category.name)}
-													title="Choose a category or wallet to cover the overage"
-												>
-													Cover
-												</button>
-											{/if}
-										{/if}
-									</div>
-									<span class={['font-semibold', overBudget && 'text-error']}>
-										{formatCurrency(Math.abs(remaining), wallet.currency)}
-										{overBudget ? 'over' : 'left'}
-									</span>
-								</div>
-								<div class="flex items-center gap-2 pl-6">
-									<div class="flex-1 h-1.5 rounded-full bg-base-200 overflow-hidden">
-										<div
-											class="h-full rounded-full transition-all"
-											style="width: {spentPct}%; background-color: {overBudget ? 'var(--color-error)' : category.color}; opacity: 0.7;"
-										></div>
-									</div>
-									{#if wallet.budget_type === 'fixed'}
-										<span class="text-xs text-base-content/40 shrink-0">of {formatCurrency(allocated, wallet.currency)}</span>
-									{/if}
-									<span class="text-xs text-base-content/60 shrink-0">
-										{formatCurrency(spent, wallet.currency)} spent
-									</span>
-								</div>
-								{#each covers as cover (cover.id + cover.direction)}
-									<div class="flex items-center gap-1 pl-6 text-xs text-base-content/50">
-										<span>
-											{cover.direction === 'in' ? '+' : '−'}{formatCurrency(cover.amount, wallet.currency)}
-											{cover.direction === 'in' ? 'covered by' : 'covering'}
-											{cover.counterpartCategory}{cover.counterpartWalletName ? ` (${cover.counterpartWalletName})` : ''}
-										</span>
-										<button
-											class="btn btn-ghost btn-xs px-1 opacity-50 hover:opacity-100"
-											onclick={() => handleRemoveCover(cover.id)}
-											title="Undo this cover"
-										>
-											×
-										</button>
-									</div>
-								{/each}
-							</div>
-						{/each}
-					</div>
-
-					<!-- Visual bar -->
-					{@const totalFixed = wallet.categories.reduce((s, c) => s + (c.fixedAmount ?? 0), 0)}
-					<div class="flex h-2 rounded-full overflow-hidden bg-base-200 mt-5">
-						{#each wallet.categories as category (category.name)}
-							{@const barPct = wallet.budget_type === "fixed"
-								? (totalFixed > 0 ? ((category.fixedAmount ?? 0) / totalFixed) * 100 : 0)
-								: category.percentage}
-							<div
-								class="h-full"
-								style="width: {barPct}%; background-color: {category.color};"
-								title="{category.name}: {wallet.budget_type === 'fixed' ? (category.fixedAmount ?? 0) : category.percentage + '%'}"
-							></div>
-						{/each}
-					</div>
-
-					{#if wallet.budget_type !== 'fixed'}
-						<div class="flex items-center justify-between mt-4 pt-4 border-t border-base-200">
-							<span class="text-xs text-base-content/50">Carry forward balance</span>
-							<input
-								type="checkbox"
-								class="toggle toggle-sm"
-								checked={wallet.carry_forward}
-								onchange={(e) => walletPref({ carry_forward: e.currentTarget.checked })}
-							/>
-						</div>
-					{/if}
-			</Card>
-
-			<!-- Transactions -->
-			<Card title="Transactions">
-					<!-- Period selector -->
-					<div class="space-y-2 mb-4">
-						<!-- Built-in periods -->
-						<div class="flex flex-wrap items-center gap-1">
-							{#each BUILTIN_PERIODS as p (p.value)}
-								<div class="flex items-center">
-									<button
-										class={['btn btn-sm', selectedPeriod === p.value ? 'btn-primary' : 'btn-ghost']}
-										onclick={() => setPeriod(p.value)}
-									>
-										{p.label}
-									</button>
-									<button
-										class="btn btn-ghost btn-xs px-1 opacity-50 hover:opacity-100"
-										onclick={() => persistWalletPrefs({ default_period: p.value })}
-										disabled={savingPrefs}
-										title="{wallet.default_period === p.value ? 'Default period' : 'Set as default'}"
-									>
-										{wallet.default_period === p.value ? '★' : '☆'}
-									</button>
-								</div>
-							{/each}
-							{#if pagedResult.totalItems > 0}
-								<button class="btn btn-ghost btn-sm ml-auto" onclick={exportCsv} title="Export as CSV">
-									↓ CSV
-								</button>
-							{/if}
-						</div>
-
-						<!-- Saved periods -->
-						{#if wallet.saved_periods.length > 0}
-							<div class="flex flex-wrap gap-1">
-								{#each wallet.saved_periods as sp (sp.name)}
-									<div class="flex items-center border border-base-300 rounded-lg overflow-hidden">
-										<button
-											class={['btn btn-sm btn-ghost rounded-none border-0', selectedPeriod === sp.name && 'btn-active']}
-											onclick={() => setPeriod(sp.name)}
-										>
-											{sp.name}
-											<span class="text-xs text-base-content/40 ml-1">{sp.startDate}–{sp.endDate}</span>
-										</button>
-										<button
-											class="btn btn-ghost btn-xs px-1 opacity-50 hover:opacity-100 rounded-none border-0"
-											onclick={() => persistWalletPrefs({ default_period: sp.name })}
-											disabled={savingPrefs}
-											title="{wallet.default_period === sp.name ? 'Default period' : 'Set as default'}"
-										>
-											{wallet.default_period === sp.name ? '★' : '☆'}
-										</button>
-										<button
-											class="btn btn-ghost btn-xs px-1 text-error opacity-50 hover:opacity-100 rounded-none border-0"
-											onclick={() => handleDeleteSavedPeriod(sp)}
-											disabled={savingPrefs}
-											title="Remove saved range"
-										>
-											×
-										</button>
-									</div>
-								{/each}
-							</div>
-						{/if}
-
-						<!-- Pay cycle day config -->
-						{#if selectedPeriod === 'pay-cycle'}
-							<div class="flex items-center gap-2 flex-wrap">
-								<button
-									class="btn btn-ghost btn-sm"
-									onclick={() => { cycleOffset--; currentPage = 1; }}
-								>&larr;</button>
-								<span class="text-sm text-base-content/70 min-w-40 text-center">
-									{dateRange.startDate} – {dateRange.endDate}
-								</span>
-								<button
-									class="btn btn-ghost btn-sm"
-									onclick={() => { cycleOffset++; currentPage = 1; }}
-								>&rarr;</button>
-								{#if cycleOffset !== 0}
-									<button
-										class="btn btn-ghost btn-xs text-base-content/50"
-										onclick={() => { cycleOffset = 0; currentPage = 1; }}
-									>today</button>
-								{/if}
-								<input
-									type="date"
-									class="input input-bordered input-xs w-32 text-xs ml-auto"
-									title="Jump to cycle containing this date"
-									onchange={(e) => jumpToCycleForDate(e.currentTarget.value)}
-								/>
-							</div>
-							<div class="flex items-center gap-2 text-sm">
-								<span class="text-base-content/60 shrink-0">Cycle starts on day</span>
-								<input
-									type="number"
-									class="input input-bordered input-sm w-20"
-									min="1"
-									max="28"
-									value={cycleStartDayInput}
-									oninput={(e) => (cycleStartDayInput = Number(e.currentTarget.value))}
-									onkeydown={(e) => e.key === 'Enter' && handleSaveCycleDay()}
-								/>
-								<span class="text-base-content/60 shrink-0">of the month</span>
-								{#if cycleStartDayInput !== cycleStartDay}
-									<Button variant="primary" onclick={handleSaveCycleDay} disabled={savingPrefs}>
-										{savingPrefs ? '…' : 'Save'}
-									</Button>
-								{/if}
-							</div>
-						{/if}
-
-						<!-- Date inputs (custom period or named saved period) -->
-						{#if showDateInputs}
-							<div class="flex items-center gap-2">
-								<input
-									type="date"
-									class="input input-bordered input-sm flex-1"
-									value={customStartDate}
-									oninput={(e) => { customStartDate = e.currentTarget.value; currentPage = 1; }}
-								/>
-								<span class="text-base-content/60 text-sm shrink-0">to</span>
-								<input
-									type="date"
-									class="input input-bordered input-sm flex-1"
-									value={customEndDate}
-									oninput={(e) => { customEndDate = e.currentTarget.value; currentPage = 1; }}
-								/>
-							</div>
-
-							<!-- Save this range -->
-							{#if customStartDate && customEndDate}
-								{#if !showSaveRangeInput}
-									<button
-										class="btn btn-ghost btn-xs"
-										onclick={() => (showSaveRangeInput = true)}
-									>
-										+ Save this range…
-									</button>
-								{:else}
-									<div class="flex items-center gap-2">
-										<input
-											type="text"
-											class="input input-bordered input-sm flex-1"
-											placeholder="Range name (e.g. Q1 2026)"
-											bind:value={saveRangeName}
-											maxlength="100"
-										/>
-										<Button
-											variant="primary"
-											onclick={handleSaveRange}
-											disabled={!saveRangeName.trim() || savingPrefs}
-										>
-											{savingPrefs ? '…' : 'Save'}
-										</Button>
-										<Button
-											variant="ghost"
-											onclick={() => { showSaveRangeInput = false; saveRangeName = ''; }}
-										>
-											Cancel
-										</Button>
-									</div>
-								{/if}
-							{/if}
-						{/if}
-					</div>
-
-					<TransactionList
-						transactions={pagedResult.items}
-						{wallet}
-						ondelete={handleDeleteTransaction}
-						onedit={handleEditTransaction}
-					/>
-
-					<!-- Pagination -->
-					{#if pagedResult.totalPages > 1}
-						<div class="flex items-center justify-between mt-4 pt-4">
-							<span class="text-sm text-base-content/40">{pagedResult.totalItems} transactions</span>
-							<div class="join">
-								<button class="join-item btn btn-sm" disabled={currentPage === 1} onclick={() => currentPage--}>&larr;</button>
-								<button class="join-item btn btn-sm btn-disabled">{currentPage} / {pagedResult.totalPages}</button>
-								<button class="join-item btn btn-sm" disabled={currentPage === pagedResult.totalPages} onclick={() => currentPage++}>&rarr;</button>
-							</div>
-						</div>
-					{/if}
-			</Card>
 		</div>
 
-		<!-- Add Transaction Modal -->
-		<Modal bind:open={showAddTransaction} title="Add Transaction">
-			<TransactionForm
-					{wallet}
-					onSuccess={(tx) => {
-						showAddTransaction = false;
-						refreshPagedQuery();
-						promptCoverIfOver(tx);
-					}}
-				/>
-		</Modal>
-
-		<!-- Reset Balance Confirmation Modal -->
-		<Modal bind:open={showResetBalanceConfirm} title="Reset Balance?">
-			<p class="text-base-content/70">
-				Set <strong>{wallet.name}</strong>'s balance from
-				<strong>{formatCurrency(wallet.balance, wallet.currency)}</strong> to
-				<strong>{formatCurrency(0, wallet.currency)}</strong>? A dated balance adjustment will preserve
-				your transaction history and can be deleted later to undo the reset.
-			</p>
-			{#snippet actions()}
-				<Button
-					variant="ghost"
-					onclick={() => (showResetBalanceConfirm = false)}
-					disabled={resettingBalance}
-				>
-					Cancel
-				</Button>
-				<Button variant="error" onclick={handleResetBalance} loading={resettingBalance}>
-					Reset to {formatCurrency(0, wallet.currency)}
-				</Button>
-			{/snippet}
-		</Modal>
-
-		<!-- Delete Wallet Confirmation Modal -->
-		<Modal
-			bind:open={showDeleteConfirm}
-			title="Delete Wallet?"
-			onclose={() => (deleteConfirmName = '')}
+		<!-- Period selector: drives both the budget and the transaction list -->
+		<PeriodFilter
+			periods={BUILTIN_PERIODS}
+			value={builtinSelection}
+			onselect={setPeriod}
+			startDate={customStartDate}
+			endDate={customEndDate}
+			showDates={showDateInputs}
+			ondateschange={(r) => {
+				customStartDate = r.startDate;
+				customEndDate = r.endDate;
+				currentPage = 1;
+			}}
 		>
-				<p class="text-base-content/70 mb-4">
-					This will permanently delete <strong>{wallet.name}</strong> and all its transactions.
-					This cannot be undone.
-				</p>
-				<label class="form-control w-full">
-					<div class="label">
-						<span class="label-text text-sm">Type <strong>{wallet.name}</strong> to confirm</span>
+			{#snippet actions()}
+				<button
+					class={[
+						'btn gap-1.5 btn-ghost btn-sm',
+						isDefaultPeriod ? 'text-warning' : 'text-base-content/50'
+					]}
+					onclick={() => persistWalletPrefs({ default_period: selectedPeriod })}
+					disabled={savingPrefs || isDefaultPeriod}
+					title={isDefaultPeriod ? 'This is the default period' : 'Open this wallet on this period'}
+				>
+					<Icon name="star" filled={isDefaultPeriod} class="size-4" />
+					<span class="text-xs">{isDefaultPeriod ? 'Default' : 'Make default'}</span>
+				</button>
+			{/snippet}
+
+			<!-- Saved periods -->
+			{#if wallet.saved_periods.length > 0}
+				<div class="flex flex-wrap items-center gap-1.5">
+					<span class="mr-1 text-xs text-base-content/50">Saved:</span>
+					{#each wallet.saved_periods as sp (sp.name)}
+						{@const active = selectedPeriod === sp.name}
+						{@const isDefault = effectiveDefaultPeriod === sp.name}
+						<div
+							class={[
+								'flex items-center rounded-full border text-sm transition-colors',
+								active
+									? 'border-primary/40 bg-primary/10 text-primary'
+									: 'border-base-300 bg-base-100 hover:border-base-content/20'
+							]}
+						>
+							<button
+								class={[
+									'grid size-7 place-items-center rounded-full',
+									isDefault ? 'text-warning' : 'text-base-content/35 hover:text-warning'
+								]}
+								onclick={() => persistWalletPrefs({ default_period: sp.name })}
+								disabled={savingPrefs || isDefault}
+								title={isDefault ? 'Default period' : 'Set as default'}
+								aria-label={isDefault
+									? `${sp.name} is the default period`
+									: `Make ${sp.name} the default period`}
+							>
+								<Icon name="star" filled={isDefault} class="size-3.5" />
+							</button>
+							<button class="py-1 pr-1 font-medium" onclick={() => setPeriod(sp.name)}>
+								{sp.name}
+								<span class="ml-1 text-xs font-normal text-base-content/50">
+									{formatShortDate(sp.startDate)} – {formatShortDate(sp.endDate)}
+								</span>
+							</button>
+							<button
+								class="grid size-7 place-items-center rounded-full text-base-content/40 hover:text-error"
+								onclick={() => handleDeleteSavedPeriod(sp)}
+								disabled={savingPrefs}
+								title="Remove saved range"
+								aria-label="Remove saved range {sp.name}"
+							>
+								<Icon name="x" class="size-3" />
+							</button>
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			<!-- Pay cycle controls -->
+			{#if selectedPeriod === 'pay-cycle'}
+				<div class="surface flex flex-wrap items-center gap-x-4 gap-y-3 p-3">
+					<div class="flex items-center gap-1">
+						<button
+							class="btn btn-square btn-ghost btn-sm"
+							onclick={() => {
+								cycleOffset--;
+								currentPage = 1;
+							}}
+							aria-label="Previous cycle"
+						>
+							<Icon name="chevron-left" class="size-4" />
+						</button>
+						<span class="min-w-44 text-center text-sm font-medium tabular-nums">
+							{describeRange(dateRange)}
+						</span>
+						<button
+							class="btn btn-square btn-ghost btn-sm"
+							onclick={() => {
+								cycleOffset++;
+								currentPage = 1;
+							}}
+							aria-label="Next cycle"
+						>
+							<Icon name="chevron-right" class="size-4" />
+						</button>
+						{#if cycleOffset !== 0}
+							<button
+								class="btn btn-ghost btn-xs"
+								onclick={() => {
+									cycleOffset = 0;
+									currentPage = 1;
+								}}>Today</button
+							>
+						{/if}
 					</div>
+					<label class="flex items-center gap-2 text-sm text-base-content/60">
+						Jump to
+						<input
+							type="date"
+							class="input input-sm w-36"
+							title="Jump to cycle containing this date"
+							onchange={(e) => jumpToCycleForDate(e.currentTarget.value)}
+						/>
+					</label>
+					<div class="flex items-center gap-2 text-sm text-base-content/60 sm:ml-auto">
+						<span>Starts on day</span>
+						<input
+							type="number"
+							class="input input-sm w-16"
+							min="1"
+							max="28"
+							aria-label="Cycle start day"
+							value={cycleStartDayInput}
+							oninput={(e) => (cycleStartDayInput = Number(e.currentTarget.value))}
+							onkeydown={(e) => e.key === 'Enter' && handleSaveCycleDay()}
+						/>
+						{#if cycleStartDayInput !== cycleStartDay}
+							<Button size="sm" onclick={handleSaveCycleDay} loading={savingPrefs}>Save</Button>
+						{/if}
+					</div>
+				</div>
+			{/if}
+		</PeriodFilter>
+
+		<!-- Save this range (custom period or named saved period) -->
+		{#if canSaveRange}
+			{#if !showSaveRangeInput}
+				<button class="btn -mt-3 btn-ghost btn-xs" onclick={() => (showSaveRangeInput = true)}>
+					<Icon name="plus" class="size-3.5" />
+					Save this range
+				</button>
+			{:else}
+				<div class="-mt-3 flex max-w-xl items-center gap-2">
 					<input
 						type="text"
-						class="input input-bordered w-full"
-						placeholder={wallet.name}
-						bind:value={deleteConfirmName}
+						class="input input-sm min-w-0 flex-1"
+						placeholder="Range name (e.g. Q1 2026)"
+						aria-label="Range name"
+						bind:value={saveRangeName}
+						maxlength="100"
 					/>
-				</label>
-			{#snippet actions()}
-				<Button variant="ghost" onclick={() => { showDeleteConfirm = false; deleteConfirmName = ''; }}>
-					Cancel
-				</Button>
-				<Button variant="error" onclick={handleDeleteWallet} disabled={deleteConfirmName !== wallet.name}>
-					Delete Wallet
-				</Button>
-			{/snippet}
-		</Modal>
+					<Button
+						size="sm"
+						onclick={handleSaveRange}
+						disabled={!saveRangeName.trim()}
+						loading={savingPrefs}
+					>
+						Save
+					</Button>
+					<Button
+						size="sm"
+						variant="ghost"
+						onclick={() => {
+							showSaveRangeInput = false;
+							saveRangeName = '';
+						}}
+					>
+						Cancel
+					</Button>
+				</div>
+			{/if}
+		{/if}
 
-		<!-- Delete Transaction Confirmation Modal -->
-		<Modal
-			open={!!transactionToDelete}
-			title="Delete Transaction?"
-			onclose={() => (transactionToDelete = null)}
+		<!-- Budget Allocation -->
+		<Card
+			title="Budget"
+			subtitle={wallet.budget_type === 'fixed'
+				? 'Fixed monthly limits'
+				: `Income split for ${describeRange(dateRange)}`}
 		>
-				{#if transactionToDelete?.transfer_id}
-					<p class="text-base-content/70">
-						This is a <strong>transfer</strong>. Deleting it will also delete the linked transaction
-						in the other wallet and reverse the balance changes on both sides.
-					</p>
-				{:else}
-					<p class="text-base-content/70">
-						Are you sure you want to delete this transaction? This will reverse its effect on your
-						wallet balance.
-					</p>
+			{#snippet header()}
+				{#if wallet.budget_type !== 'fixed'}
+					<label
+						class="flex cursor-pointer items-center gap-2 text-xs text-base-content/60"
+						title="Roll unspent budget into the next period"
+					>
+						Carry forward
+						<input
+							type="checkbox"
+							class="toggle toggle-xs toggle-primary"
+							checked={wallet.carry_forward}
+							onchange={(e) => walletPref({ carry_forward: e.currentTarget.checked })}
+						/>
+					</label>
 				{/if}
-			{#snippet actions()}
-				<Button variant="ghost" onclick={() => (transactionToDelete = null)}>Cancel</Button>
-				<Button variant="error" onclick={confirmDeleteTransaction}>Delete Transaction</Button>
 			{/snippet}
-		</Modal>
-		<!-- Transfer Modal -->
-		<Modal bind:open={showTransfer} title="Transfer Between Wallets">
+
+			{#if wallet.budget_type !== 'fixed' && effectivePeriodIncome === 0 && selectedPeriod !== 'all-time'}
+				<div
+					class="mb-4 flex items-center gap-2 rounded-field bg-base-200/70 px-3 py-2 text-xs text-base-content/60"
+				>
+					<Icon name="info" class="size-4" />
+					No income this period, so nothing is allocated yet. Switch to All Time to see the full allocation.
+				</div>
+			{/if}
+
+			<!-- Allocation bar -->
+			<div class="mb-5 flex h-2 gap-0.5 overflow-hidden rounded-full">
+				{#each wallet.categories as category, i (category.name)}
+					<div
+						class="h-full"
+						style:width="{allocationShares[i]}%"
+						style:background-color={category.color}
+						title="{category.name}: {wallet.budget_type === 'fixed'
+							? formatCurrency(category.fixedAmount ?? 0, wallet.currency)
+							: category.percentage + '%'}"
+					></div>
+				{/each}
+			</div>
+
+			<div class="grid gap-x-8 gap-y-5 md:grid-cols-2">
+				{#each wallet.categories as category, i (category.name)}
+					{@const budget = categoryBudgets[i]}
+					{@const allocated = budget.allocated}
+					{@const spent = budget.spent}
+					{@const remaining = budget.remaining}
+					{@const covers = summary.covers.filter(
+						(c) => c.category.toLowerCase() === category.name.toLowerCase()
+					)}
+					{@const spentPct = allocated > 0 ? Math.min(100, (spent / allocated) * 100) : 0}
+					{@const overBudget = remaining < 0}
+					<div>
+						<div class="flex items-center justify-between gap-2">
+							<div class="flex min-w-0 items-center gap-2">
+								<label
+									class="relative size-3.5 shrink-0 cursor-pointer rounded ring-1 ring-black/5 ring-inset"
+									style:background-color={category.color}
+									title="Change color"
+								>
+									<input
+										type="color"
+										value={category.color}
+										class="absolute inset-0 cursor-pointer opacity-0"
+										aria-label="Change {category.name} color"
+										onchange={(e) =>
+											updateCategoryColor({
+												id: wallet.id,
+												categoryName: category.name,
+												color: e.currentTarget.value
+											})}
+									/>
+								</label>
+								<span class="truncate font-medium">{category.name}</span>
+								{#if wallet.budget_type !== 'fixed'}
+									<span class="text-xs text-base-content/45 tabular-nums">{category.percentage}%</span>
+								{/if}
+							</div>
+							<span
+								class={[
+									'shrink-0 text-sm font-semibold tabular-nums',
+									overBudget ? 'text-error' : 'text-base-content'
+								]}
+							>
+								{formatCurrency(Math.abs(remaining), wallet.currency)}
+								<span class="font-normal text-base-content/50">{overBudget ? 'over' : 'left'}</span>
+							</span>
+						</div>
+						<div class="mt-2 h-2 overflow-hidden rounded-full bg-base-200">
+							<div
+								class="h-full rounded-full transition-all"
+								style:width="{overBudget ? 100 : spentPct}%"
+								style:background-color={overBudget ? 'var(--color-error)' : category.color}
+							></div>
+						</div>
+						<div class="mt-1.5 flex items-center justify-between gap-2 text-xs text-base-content/50">
+							<span class="tabular-nums">
+								<span class={[spent > 0 && 'font-medium text-error']}
+									>{formatCurrency(spent, wallet.currency)}</span
+								>
+								of {formatCurrency(allocated, wallet.currency)}
+							</span>
+							{#if overBudget && wallet.budget_type === 'percentage'}
+								<button
+									class="btn btn-soft btn-xs btn-error"
+									onclick={() => coverFromSelectedPeriod(category.name)}
+									title="Choose a category or wallet to cover the overage"
+								>
+									Cover overage
+								</button>
+							{:else if overBudget}
+								<span class="badge badge-soft badge-xs badge-error">Over budget</span>
+							{/if}
+						</div>
+						{#each covers as cover (cover.id + cover.direction)}
+							<div class="mt-1 flex items-center gap-1 text-xs text-base-content/55">
+								<Icon
+									name="transfer"
+									class={[
+										'size-3',
+										cover.direction === 'in' ? 'text-success' : 'text-base-content/40'
+									]}
+								/>
+								<span>
+									{cover.direction === 'in' ? '+' : '−'}{formatCurrency(
+										cover.amount,
+										wallet.currency
+									)}
+									{cover.direction === 'in' ? 'covered by' : 'covering'}
+									{cover.counterpartCategory}{cover.counterpartWalletName
+										? ` (${cover.counterpartWalletName})`
+										: ''}
+								</span>
+								<button
+									class="btn btn-square text-base-content/40 btn-ghost btn-xs hover:text-error"
+									onclick={() => handleRemoveCover(cover.id)}
+									title="Undo this cover"
+									aria-label="Undo this cover"
+								>
+									<Icon name="x" class="size-3" />
+								</button>
+							</div>
+						{/each}
+					</div>
+				{/each}
+			</div>
+		</Card>
+
+		<!-- Transactions -->
+		<Card title="Transactions" subtitle={describeRange(dateRange)}>
+			{#snippet header()}
+				{#if pagedResult.totalItems > 0}
+					<button class="btn btn-ghost btn-sm" onclick={exportCsv} title="Export as CSV">
+						<Icon name="download" class="size-4" />
+						<span class="hidden sm:inline">CSV</span>
+					</button>
+				{/if}
+				<Button size="sm" variant="soft" icon="plus" onclick={() => (showAddTransaction = true)}>
+					Add
+				</Button>
+			{/snippet}
+
+			<TransactionList
+				transactions={pagedResult.items}
+				{wallet}
+				ondelete={handleDeleteTransaction}
+				onedit={handleEditTransaction}
+			/>
+
+			{#if pagedResult.totalItems > 0}
+				<div class="mt-5">
+					<Pagination
+						page={currentPage}
+						totalPages={pagedResult.totalPages}
+						totalItems={pagedResult.totalItems}
+						onchange={(p) => (currentPage = p)}
+					/>
+				</div>
+			{/if}
+		</Card>
+	</div>
+
+	<!-- Add Transaction Modal -->
+	<Modal bind:open={showAddTransaction} title="Add transaction" description={wallet.name}>
+		<TransactionForm
+			{wallet}
+			onSuccess={(tx) => {
+				showAddTransaction = false;
+				refreshPagedQuery();
+				promptCoverIfOver(tx);
+			}}
+		/>
+	</Modal>
+
+	<!-- Reset Balance Confirmation Modal -->
+	<Modal bind:open={showResetBalanceConfirm} title="Reset balance?">
+		<p class="text-sm text-base-content/70">
+			Set <strong>{wallet.name}</strong>'s balance from
+			<strong>{formatCurrency(wallet.balance, wallet.currency)}</strong> to
+			<strong>{formatCurrency(0, wallet.currency)}</strong>? A dated balance adjustment will preserve
+			your transaction history and can be deleted later to undo the reset.
+		</p>
+		{#snippet actions()}
+			<Button
+				variant="ghost"
+				onclick={() => (showResetBalanceConfirm = false)}
+				disabled={resettingBalance}
+			>
+				Cancel
+			</Button>
+			<Button variant="error" onclick={handleResetBalance} loading={resettingBalance}>
+				Reset to {formatCurrency(0, wallet.currency)}
+			</Button>
+		{/snippet}
+	</Modal>
+
+	<!-- Delete Wallet Confirmation Modal -->
+	<Modal
+		bind:open={showDeleteConfirm}
+		title="Delete wallet?"
+		onclose={() => (deleteConfirmName = '')}
+	>
+		<p class="mb-4 text-sm text-base-content/70">
+			This will permanently delete <strong>{wallet.name}</strong> and all its transactions. This cannot
+			be undone.
+		</p>
+		<label class="flex w-full flex-col gap-1.5">
+			<span class="text-sm">Type <strong>{wallet.name}</strong> to confirm</span>
+			<input type="text" class="input w-full" placeholder={wallet.name} bind:value={deleteConfirmName} />
+		</label>
+		{#snippet actions()}
+			<Button
+				variant="ghost"
+				onclick={() => {
+					showDeleteConfirm = false;
+					deleteConfirmName = '';
+				}}
+			>
+				Cancel
+			</Button>
+			<Button
+				variant="error"
+				onclick={handleDeleteWallet}
+				disabled={deleteConfirmName !== wallet.name}
+			>
+				Delete wallet
+			</Button>
+		{/snippet}
+	</Modal>
+
+	<!-- Delete Transaction Confirmation Modal -->
+	<Modal
+		open={!!transactionToDelete}
+		title="Delete transaction?"
+		onclose={() => (transactionToDelete = null)}
+	>
+		{#if transactionToDelete?.transfer_id}
+			<p class="text-sm text-base-content/70">
+				This is a <strong>transfer</strong>. Deleting it will also delete the linked transaction in
+				the other wallet and reverse the balance changes on both sides.
+			</p>
+		{:else}
+			<p class="text-sm text-base-content/70">
+				Are you sure you want to delete this transaction? This will reverse its effect on your wallet
+				balance.
+			</p>
+		{/if}
+		{#snippet actions()}
+			<Button variant="ghost" onclick={() => (transactionToDelete = null)}>Cancel</Button>
+			<Button variant="error" onclick={confirmDeleteTransaction}>Delete transaction</Button>
+		{/snippet}
+	</Modal>
+
+	<!-- Transfer Modal -->
+	<Modal bind:open={showTransfer} title="Transfer between wallets">
+		<svelte:boundary>
+			{@const allWallets = await getWallets()}
+			<TransferForm
+				sourceWallet={wallet}
+				wallets={allWallets}
+				onSuccess={() => {
+					showTransfer = false;
+					refreshPagedQuery();
+				}}
+				onCancel={() => (showTransfer = false)}
+			/>
+			{#snippet pending()}
+				<div class="grid place-items-center py-8">
+					<span class="loading loading-spinner"></span>
+				</div>
+			{/snippet}
+		</svelte:boundary>
+	</Modal>
+
+	<!-- Edit Transaction Modal -->
+	<Modal
+		open={!!transactionToEdit}
+		title="Edit transaction"
+		onclose={() => (transactionToEdit = null)}
+	>
+		{#if transactionToEdit}
+			<EditTransactionForm
+				transaction={transactionToEdit}
+				{wallet}
+				onSuccess={(tx) => {
+					const previous = transactionToEdit ?? undefined;
+					transactionToEdit = null;
+					refreshPagedQuery();
+					promptCoverIfOver(tx, previous);
+				}}
+				onCancel={() => (transactionToEdit = null)}
+			/>
+		{/if}
+	</Modal>
+
+	<!-- Cover Overage Modal -->
+	<Modal open={!!coverRequest} title="Cover overage" onclose={() => (coverRequest = null)}>
+		{#if coverRequest}
 			<svelte:boundary>
 				{@const allWallets = await getWallets()}
-				<TransferForm
-					sourceWallet={wallet}
+				<CoverOverageForm
+					{wallet}
+					{...coverRequest}
 					wallets={allWallets}
-					onSuccess={() => {
-						showTransfer = false;
+					onCovered={() => {
+						coverRequest = null;
 						refreshPagedQuery();
 					}}
-					onCancel={() => (showTransfer = false)}
+					onSkip={() => (coverRequest = null)}
 				/>
 				{#snippet pending()}
-					<span class="loading loading-spinner"></span>
+					<div class="grid place-items-center py-8">
+						<span class="loading loading-spinner"></span>
+					</div>
 				{/snippet}
 			</svelte:boundary>
-		</Modal>
-
-		<!-- Edit Transaction Modal -->
-		<Modal
-			open={!!transactionToEdit}
-			title="Edit Transaction"
-			onclose={() => (transactionToEdit = null)}
-		>
-				{#if transactionToEdit}
-					<EditTransactionForm
-						transaction={transactionToEdit}
-						{wallet}
-						onSuccess={(tx) => {
-							const previous = transactionToEdit ?? undefined;
-							transactionToEdit = null;
-							refreshPagedQuery();
-							promptCoverIfOver(tx, previous);
-						}}
-						onCancel={() => (transactionToEdit = null)}
-					/>
-				{/if}
-		</Modal>
-
-		<!-- Cover Overage Modal -->
-		<Modal open={!!coverRequest} title="Cover Overage" onclose={() => (coverRequest = null)}>
-			{#if coverRequest}
-				<svelte:boundary>
-					{@const allWallets = await getWallets()}
-					<CoverOverageForm
-						{wallet}
-						{...coverRequest}
-						wallets={allWallets}
-						onCovered={() => {
-							coverRequest = null;
-							refreshPagedQuery();
-						}}
-						onSkip={() => (coverRequest = null)}
-					/>
-					{#snippet pending()}
-						<span class="loading loading-spinner"></span>
-					{/snippet}
-				</svelte:boundary>
-			{/if}
-		</Modal>
+		{/if}
+	</Modal>
 </AuthGuard>
