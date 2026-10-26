@@ -42,9 +42,9 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if open}
-	<div class="modal-open modal modal-bottom sm:modal-middle" role="presentation">
+	<div class="modal-open modal modal-middle" role="presentation">
 		<div
-			class={['modal-box max-h-[90dvh] sm:max-w-lg', className]}
+			class={['modal-box max-h-[90dvh] max-w-lg', className]}
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby={title ? titleId : undefined}

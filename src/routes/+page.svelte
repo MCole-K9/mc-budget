@@ -95,14 +95,23 @@
 </svelte:head>
 
 {#if user}
-	<header class="mb-8 flex flex-wrap items-end justify-between gap-4">
-		<div>
+	<header class="mb-8 flex items-end justify-between gap-4">
+		<div class="min-w-0">
 			<p class="text-sm text-base-content/55">{formatToday()}</p>
 			<h1 class="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
 				{getGreeting()}{firstName ? `, ${firstName}` : ''}
 			</h1>
 		</div>
-		<Button href={resolve('/wallets/new')} icon="plus" size="sm">New wallet</Button>
+		<!-- Icon-only on phones so the button doesn't wrap under the greeting -->
+		<Button
+			href={resolve('/wallets/new')}
+			icon="plus"
+			size="sm"
+			class="max-sm:btn-square"
+			aria-label="New wallet"
+		>
+			<span class="hidden sm:inline">New wallet</span>
+		</Button>
 	</header>
 
 	{#if wallets.length === 0}
@@ -145,24 +154,26 @@
 				</p>
 			</div>
 
-			<!-- With several currencies, label each pair by currency instead of the month -->
+			<!-- Labels stay short so they fit half a phone screen; the month goes in the caption -->
 			{#each monthEntries as [currency, { income, expense }] (currency)}
-				{@const suffix = monthEntries.length > 1 ? currency : monthName}
+				{@const suffix = monthEntries.length > 1 ? ` · ${currency}` : ''}
 				<StatCard
-					label="Income · {suffix}"
+					label="Income{suffix}"
 					value={formatCurrency(income, currency)}
+					caption={monthName}
 					tone="success"
 					icon="trending-up"
 				/>
 				<StatCard
-					label="Spent · {suffix}"
+					label="Spent{suffix}"
 					value={formatCurrency(expense, currency)}
+					caption={monthName}
 					tone="error"
 					icon="trending-down"
 				/>
 			{:else}
-				<StatCard label="Income · {monthName}" value="—" tone="success" icon="trending-up" />
-				<StatCard label="Spent · {monthName}" value="—" tone="error" icon="trending-down" />
+				<StatCard label="Income" value="—" caption={monthName} tone="success" icon="trending-up" />
+				<StatCard label="Spent" value="—" caption={monthName} tone="error" icon="trending-down" />
 			{/each}
 		</section>
 
