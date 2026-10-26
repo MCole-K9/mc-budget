@@ -7,12 +7,22 @@
 		value: string;
 		tone?: 'neutral' | 'success' | 'error';
 		icon?: IconName;
+		/** Small text under the value, e.g. the period it covers */
+		caption?: string;
 		/** Muted variant for secondary totals */
 		muted?: boolean;
 		class?: ClassValue;
 	}
 
-	let { label, value, tone = 'neutral', icon, muted = false, class: className }: Props = $props();
+	let {
+		label,
+		value,
+		tone = 'neutral',
+		icon,
+		caption,
+		muted = false,
+		class: className
+	}: Props = $props();
 
 	const toneClasses = {
 		neutral: { text: '', chip: 'bg-base-200 text-base-content/60' },
@@ -39,4 +49,7 @@
 	>
 		{value}
 	</p>
+	{#if caption}
+		<p class="mt-0.5 truncate text-xs text-base-content/50">{caption}</p>
+	{/if}
 </div>
