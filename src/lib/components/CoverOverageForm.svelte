@@ -7,6 +7,8 @@
 	import Select from './Select.svelte';
 	import Input from './Input.svelte';
 	import Button from './Button.svelte';
+	import Alert from './Alert.svelte';
+	import { formatCurrency } from '$lib/utils/format';
 
 	interface Props {
 		wallet: Wallet;
@@ -41,10 +43,6 @@
 	const sourceWallet = $derived(
 		sourceWalletId === wallet.id ? wallet : otherWallets.find((w) => w.id === sourceWalletId)
 	);
-
-	function formatCurrency(value: number, currency: string): string {
-		return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
-	}
 
 	function optionLabel(b: CategoryBudget, currency: string): string {
 		const left = b.remaining >= 0 ? `${formatCurrency(b.remaining, currency)} left` : `${formatCurrency(-b.remaining, currency)} over`;
@@ -92,14 +90,17 @@
 </script>
 
 <form onsubmit={handleSubmit} class="space-y-4">
-	<p class="text-base-content/70">
-		<strong>{category}</strong> is
-		<strong class="text-error">{formatCurrency(overage, wallet.currency)}</strong> over budget for
-		{periodText}. Where should the extra money come from?
-	</p>
+	<div class="rounded-box bg-error/8 p-4 text-sm">
+		<p>
+			<strong>{category}</strong> is
+			<strong class="text-error">{formatCurrency(overage, wallet.currency)}</strong> over budget for
+			{periodText}.
+		</p>
+		<p class="mt-1 text-base-content/60">Where should the extra money come from?</p>
+	</div>
 
 	{#if error}
-		<div class="alert alert-error py-2 text-sm">{error}</div>
+		<Alert type="error">{error}</Alert>
 	{/if}
 
 	{#if otherWallets.length > 0}
@@ -144,7 +145,7 @@
 				<span class="loading loading-spinner loading-sm"></span>
 			{/snippet}
 			{#snippet failed(err)}
-				<div class="alert alert-error py-2 text-sm">{errorMessage(err)}</div>
+				<Alert type="error">{errorMessage(err)}</Alert>
 			{/snippet}
 		</svelte:boundary>
 	{/if}
@@ -158,7 +159,7 @@
 		bind:value={amount}
 	/>
 
-	<div class="flex gap-2">
+	<div class="flex gap-2 pt-2">
 		<Button type="button" variant="ghost" class="flex-1" onclick={onSkip}>Leave over budget</Button>
 		<Button type="submit" variant="primary" class="flex-1" loading={submitting}>Cover overage</Button>
 	</div>

@@ -1,55 +1,67 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import type { Wallet } from '$lib/types/budget';
-	import Card from './Card.svelte';
+	import { formatCurrency } from '$lib/utils/format';
+	import Icon from './Icon.svelte';
 
 	interface Props {
 		wallet: Wallet;
-		onclick?: () => void;
 	}
 
-	let { wallet, onclick }: Props = $props();
+	let { wallet }: Props = $props();
 
-	function formatCurrency(amount: number, currency: string): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: currency
-		}).format(amount);
-	}
+	// Fixed-amount wallets have no percentages; size the bar by each category's share of the total
+	const shares = $derived.by(() => {
+		if (wallet.budget_type !== 'fixed') return wallet.categories.map((c) => c.percentage);
+		const total = wallet.categories.reduce((s, c) => s + (c.fixedAmount ?? 0), 0);
+		return wallet.categories.map((c) => (total > 0 ? ((c.fixedAmount ?? 0) / total) * 100 : 0));
+	});
 </script>
 
-<button type="button" class="text-left w-full" onclick={onclick}>
-	<Card class="h-full transition-all hover:shadow-md cursor-pointer">
-		{#snippet children()}
-			<div class="flex justify-between items-start mb-5">
-				<div>
-					<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-0.5">{wallet.currency}</p>
-					<h3 class="font-semibold text-lg leading-tight">{wallet.name}</h3>
-				</div>
-				<p class="text-2xl font-bold text-primary tabular-nums">
-					{formatCurrency(wallet.balance, wallet.currency)}
+<a
+	href={resolve('/wallets/[id]', { id: wallet.id })}
+	class="group flex h-full flex-col surface p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5"
+>
+	<div class="flex items-start justify-between gap-3">
+		<div class="flex min-w-0 items-center gap-3">
+			<span class="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+				<Icon name="wallet" class="size-5" />
+			</span>
+			<div class="min-w-0">
+				<h3 class="truncate leading-tight font-semibold">{wallet.name}</h3>
+				<p class="mt-0.5 text-xs text-base-content/50">
+					{wallet.currency} · {wallet.budget_type === 'fixed' ? 'Fixed limits' : '% of income'}
 				</p>
 			</div>
+		</div>
+		<Icon
+			name="chevron-right"
+			class="mt-2.5 size-4 text-base-content/30 transition-transform group-hover:translate-x-0.5 group-hover:text-base-content/60"
+		/>
+	</div>
 
-			<div class="flex h-2 rounded-full overflow-hidden bg-base-200">
-				{#each wallet.categories as category (category.name)}
-					<div
-						class="h-full"
-						style="width: {category.percentage}%; background-color: {category.color};"
-						title="{category.name}: {category.percentage}%"
-					></div>
-				{/each}
-			</div>
-			<div class="flex flex-wrap gap-x-3 gap-y-1 mt-2.5">
-				{#each wallet.categories as category (category.name)}
-					<div class="flex items-center gap-1 text-xs text-base-content/50">
-						<span
-							class="w-2 h-2 rounded-full shrink-0"
-							style="background-color: {category.color};"
-						></span>
-						<span>{category.name}</span>
-					</div>
-				{/each}
-			</div>
-		{/snippet}
-	</Card>
-</button>
+	<p class="mt-5 text-[1.75rem] leading-none font-bold tracking-tight tabular-nums">
+		{formatCurrency(wallet.balance, wallet.currency)}
+	</p>
+
+	<div class="mt-auto pt-5">
+		<div class="flex h-1.5 gap-0.5 overflow-hidden rounded-full">
+			{#each wallet.categories as category, i (category.name)}
+				<div
+					class="h-full first:rounded-l-full last:rounded-r-full"
+					style:width="{shares[i]}%"
+					style:background-color={category.color}
+					title="{category.name}: {Math.round(shares[i])}%"
+				></div>
+			{/each}
+		</div>
+		<div class="mt-3 flex flex-wrap gap-x-3 gap-y-1">
+			{#each wallet.categories as category (category.name)}
+				<span class="flex items-center gap-1.5 text-xs text-base-content/55">
+					<span class="size-2 shrink-0 rounded-full" style:background-color={category.color}></span>
+					{category.name}
+				</span>
+			{/each}
+		</div>
+	</div>
+</a>

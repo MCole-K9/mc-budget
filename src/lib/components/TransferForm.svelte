@@ -6,6 +6,9 @@
 	import { todayYmd } from '$lib/utils/dateRange';
 	import Input from './Input.svelte';
 	import Button from './Button.svelte';
+	import Alert from './Alert.svelte';
+	import EmptyState from './EmptyState.svelte';
+	import Icon from './Icon.svelte';
 
 	interface Props {
 		sourceWallet: Wallet;
@@ -36,18 +39,28 @@
 	<input type="hidden" name="sourceWalletId" value={sourceWallet.id} />
 
 	{#each transferBetweenWallets.fields.allIssues() as issue (issue.message)}
-		<div class="alert alert-error py-2 text-sm">{issue.message}</div>
+		<Alert type="error">{issue.message}</Alert>
 	{/each}
 
 	{#if destWallets.length === 0}
-		<p class="text-sm text-base-content/50 py-4 text-center">No other wallets to transfer to.</p>
+		<EmptyState
+			plain
+			icon="wallet"
+			title="No other wallets"
+			description="Create another wallet to move money between them."
+		/>
 	{:else}
-		<div class="flex items-center gap-3 text-sm">
-			<span class="font-medium shrink-0">{sourceWallet.name}</span>
-			<span class="text-base-content/40 shrink-0">→</span>
-			<div class="flex-1">
-				<Select name="destWalletId" options={destOptions} required />
+		<div class="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+			<div class="flex min-w-0 flex-col gap-1.5">
+				<span class="text-sm font-medium text-base-content/80">From</span>
+				<div class="input w-full bg-base-200/60">
+					<span class="truncate font-medium">{sourceWallet.name}</span>
+				</div>
 			</div>
+			<span class="grid size-10 place-items-center text-base-content/40">
+				<Icon name="arrow-right" class="size-4" />
+			</span>
+			<Select label="To" name="destWalletId" options={destOptions} required />
 		</div>
 
 		<Input
@@ -72,7 +85,7 @@
 			value={todayLocal}
 		/>
 
-		<div class="flex gap-2">
+		<div class="flex gap-2 pt-2">
 			{#if onCancel}
 				<Button type="button" variant="ghost" class="flex-1" onclick={onCancel}>Cancel</Button>
 			{/if}

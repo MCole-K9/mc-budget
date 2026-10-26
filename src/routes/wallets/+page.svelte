@@ -1,10 +1,12 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { getWallets, getArchivedWallets } from '$lib/wallets.remote';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import WalletCard from '$lib/components/WalletCard.svelte';
 	import Button from '$lib/components/Button.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import Icon from '$lib/components/Icon.svelte';
 
 	const wallets = $derived(await getWallets());
 
@@ -12,65 +14,72 @@
 </script>
 
 <svelte:head>
-	<title>My Wallets - MC Budget</title>
+	<title>Wallets - MC Budget</title>
 </svelte:head>
 
 <AuthGuard>
-	{#snippet children()}
-		<div class="max-w-4xl mx-auto">
-			<div class="flex justify-between items-center mb-6">
-				<h1 class="text-2xl font-bold">My Wallets</h1>
-				<a href={resolve('/wallets/new')}>
-					<Button variant="primary">Create Wallet</Button>
-				</a>
-			</div>
+	<PageHeader title="Wallets" subtitle="Each wallet has its own balance and budget split.">
+		{#snippet actions()}
+			<Button href={resolve('/wallets/new')} icon="plus" size="sm">New wallet</Button>
+		{/snippet}
+	</PageHeader>
 
-			{#if wallets.length === 0}
-				<div class="text-center py-12">
-					<p class="text-base-content/70 mb-4">You don't have any wallets yet</p>
-					<a href={resolve('/wallets/new')}>
-						<Button variant="primary">Create Your First Wallet</Button>
-					</a>
-				</div>
-			{:else}
-				<div class="grid gap-4 md:grid-cols-2">
-					{#each wallets as wallet (wallet.id)}
-						<WalletCard {wallet} onclick={() => goto(resolve('/wallets/[id]', { id: wallet.id }))} />
-					{/each}
-				</div>
-			{/if}
-
-			<!-- Archived wallets -->
-			<div class="mt-8">
-				<button
-					class="flex items-center gap-2 text-sm text-base-content/40 hover:text-base-content/70 transition-colors"
-					onclick={() => (showArchived = !showArchived)}
-				>
-					<span>{showArchived ? '▾' : '▸'}</span>
-					<span>Archived wallets</span>
-				</button>
-
-				{#if showArchived}
-					<svelte:boundary>
-						{@const archived = await getArchivedWallets()}
-						{#if archived.length === 0}
-							<p class="text-sm text-base-content/30 mt-3 pl-4">No archived wallets.</p>
-						{:else}
-							<div class="grid gap-4 md:grid-cols-2 mt-3 opacity-60">
-								{#each archived as wallet (wallet.id)}
-									<WalletCard
-										{wallet}
-										onclick={() => goto(resolve('/wallets/[id]', { id: wallet.id }))}
-									/>
-								{/each}
-							</div>
-						{/if}
-						{#snippet pending()}
-							<span class="loading loading-spinner loading-sm mt-3 ml-4"></span>
-						{/snippet}
-					</svelte:boundary>
-				{/if}
-			</div>
+	{#if wallets.length === 0}
+		<EmptyState
+			icon="wallet"
+			title="No wallets yet"
+			description="Create a wallet to start tracking a balance against a budget."
+		>
+			{#snippet action()}
+				<Button href={resolve('/wallets/new')} icon="plus">Create your first wallet</Button>
+			{/snippet}
+		</EmptyState>
+	{:else}
+		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+			{#each wallets as wallet (wallet.id)}
+				<WalletCard {wallet} />
+			{/each}
+			<a
+				href={resolve('/wallets/new')}
+				class="flex min-h-48 flex-col items-center justify-center gap-2 rounded-box border-2 border-dashed border-base-300 text-sm font-medium text-base-content/50 transition-colors hover:border-primary/40 hover:text-primary"
+			>
+				<Icon name="plus" class="size-6" />
+				New wallet
+			</a>
 		</div>
-	{/snippet}
+	{/if}
+
+	<!-- Archived wallets -->
+	<div class="mt-10">
+		<button
+			class="flex items-center gap-2 text-sm font-medium text-base-content/55 transition-colors hover:text-base-content"
+			onclick={() => (showArchived = !showArchived)}
+			aria-expanded={showArchived}
+		>
+			<Icon
+				name="chevron-right"
+				class={['size-4 transition-transform', showArchived && 'rotate-90']}
+			/>
+			<Icon name="archive" class="size-4" />
+			Archived wallets
+		</button>
+
+		{#if showArchived}
+			<svelte:boundary>
+				{@const archived = await getArchivedWallets()}
+				{#if archived.length === 0}
+					<p class="mt-3 pl-6 text-sm text-base-content/45">No archived wallets.</p>
+				{:else}
+					<div class="mt-4 grid gap-4 opacity-70 sm:grid-cols-2 lg:grid-cols-3">
+						{#each archived as wallet (wallet.id)}
+							<WalletCard {wallet} />
+						{/each}
+					</div>
+				{/if}
+				{#snippet pending()}
+					<span class="loading mt-3 ml-6 loading-sm loading-spinner"></span>
+				{/snippet}
+			</svelte:boundary>
+		{/if}
+	</div>
 </AuthGuard>

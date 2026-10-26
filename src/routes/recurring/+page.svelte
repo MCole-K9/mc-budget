@@ -4,6 +4,11 @@
 	import Modal from '$lib/components/Modal.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import { resolve } from '$app/paths';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import Alert from '$lib/components/Alert.svelte';
+	import Icon from '$lib/components/Icon.svelte';
+	import { formatSignedCurrency } from '$lib/utils/format';
 
 	const scheduleList = $derived(await getRecurringSchedules());
 
@@ -25,10 +30,6 @@
 		value: String(i + 1),
 		label: String(i + 1)
 	}));
-
-	function formatCurrency(amount: number, currency: string): string {
-		return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(amount);
-	}
 
 	let savingId = $state('');
 	let error = $state('');
@@ -100,143 +101,167 @@
 </svelte:head>
 
 <AuthGuard>
-	<div class="max-w-2xl mx-auto space-y-6">
-		<div>
-			<h1 class="text-2xl font-bold">Recurring Transactions</h1>
-			<p class="text-sm text-base-content/50 mt-1">Monthly schedules. Click an amount to change what future recurrences will use.</p>
-		</div>
+	<PageHeader
+		title="Recurring"
+		subtitle="Monthly schedules. Changing an amount only affects future recurrences."
+	/>
 
+	<div class="space-y-6">
 		{#if error}
-			<div class="alert alert-error py-2 text-sm">{error}</div>
+			<Alert type="error" dismissible ondismiss={() => (error = '')}>{error}</Alert>
 		{/if}
 
 		{#if grouped.length === 0}
-			<div class="bg-base-100 rounded-2xl shadow-sm p-12 text-center">
-				<p class="text-base-content/40 text-sm">No recurring transactions yet.</p>
-				<p class="text-base-content/30 text-xs mt-1">Mark a transaction as "Repeat monthly" when creating it.</p>
-			</div>
+			<EmptyState
+				icon="repeat"
+				title="No recurring transactions yet"
+				description="Turn on “Repeat monthly” when adding a transaction to schedule it here."
+			/>
 		{:else}
 			{#each grouped as group (group.walletId)}
-				<div class="space-y-2">
-					<div class="flex items-center gap-3 px-1">
+				<section>
+					<div class="mb-2 flex items-center justify-between px-1">
 						<a
 							href={resolve('/wallets/[id]', { id: group.walletId })}
-							class="text-xs font-semibold text-base-content/40 uppercase tracking-widest hover:text-base-content/70 transition-colors"
+							class="flex items-center gap-1.5 text-sm font-semibold transition-colors hover:text-primary"
 						>
+							<Icon name="wallet" class="size-4 text-base-content/45" />
 							{group.walletName}
 						</a>
-						<div class="flex-1 h-px bg-base-200"></div>
+						<span class="text-xs text-base-content/50">
+							{group.items.length} schedule{group.items.length !== 1 ? 's' : ''}
+						</span>
 					</div>
 
-					<div class="bg-base-100 rounded-2xl shadow-sm overflow-hidden">
-						<div class="divide-y divide-base-200">
-							{#each group.items as schedule (schedule.id)}
-								{@const saving = savingId === schedule.id}
-								{@const editingAmount = editingAmountId === schedule.id}
-								<div class="flex items-center gap-3 px-4 py-3 {!schedule.active ? 'opacity-40' : ''}">
-									<span
-										class="w-2.5 h-2.5 rounded-full shrink-0"
-										style="background-color: {schedule.categoryColor ?? (schedule.amount > 0 ? '#22c55e' : '#9ca3af')};"
-									></span>
+					<div class="surface divide-y divide-base-300/60 overflow-hidden">
+						{#each group.items as schedule (schedule.id)}
+							{@const saving = savingId === schedule.id}
+							{@const editingAmount = editingAmountId === schedule.id}
+							{@const color =
+								schedule.categoryColor ?? (schedule.amount > 0 ? 'var(--color-success)' : '#9ca3af')}
+							<div
+								class={[
+									'flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 transition-opacity sm:flex-nowrap',
+									!schedule.active && 'opacity-50'
+								]}
+							>
+								<span
+									class="grid size-9 shrink-0 place-items-center rounded-xl"
+									style:background-color="color-mix(in oklab, {color} 16%, transparent)"
+									style:color
+								>
+									<Icon name={schedule.active ? 'repeat' : 'pause'} class="size-4" />
+								</span>
 
-									<div class="flex-1 min-w-0">
-										<p class="font-medium text-sm leading-snug truncate">
-											{schedule.description || schedule.category}
-										</p>
-										<p class="text-xs text-base-content/40 truncate">{schedule.category}</p>
-									</div>
+								<div class="min-w-0 flex-1">
+									<p class="truncate text-sm leading-snug font-medium">
+										{schedule.description || schedule.category}
+									</p>
+									<p class="truncate text-xs text-base-content/50">
+										{schedule.category} · day {schedule.recur_day || 1} of each month{schedule.active
+											? ''
+											: ' · paused'}
+									</p>
+								</div>
 
-									<!-- Editable amount (changes schedule only, not past transactions) -->
-									{#if editingAmount}
-										<input
-											use:focusOnMount
-											type="number"
-											class="input input-bordered input-xs w-24 text-right tabular-nums"
-											value={editingAmountValue}
-											min="0.01"
-											step="0.01"
-											oninput={(e) => (editingAmountValue = e.currentTarget.value)}
-											onblur={() => saveAmount(schedule, editingAmountValue)}
-											onkeydown={(e) => {
-												if (e.key === 'Enter') e.currentTarget.blur();
-												if (e.key === 'Escape') editingAmountId = '';
-											}}
+								<!-- Editable amount (changes schedule only, not past transactions) -->
+								{#if editingAmount}
+									<input
+										use:focusOnMount
+										type="number"
+										class="input w-28 text-right tabular-nums input-sm"
+										aria-label="Future amount"
+										value={editingAmountValue}
+										min="0.01"
+										step="0.01"
+										oninput={(e) => (editingAmountValue = e.currentTarget.value)}
+										onblur={() => saveAmount(schedule, editingAmountValue)}
+										onkeydown={(e) => {
+											if (e.key === 'Enter') e.currentTarget.blur();
+											if (e.key === 'Escape') editingAmountId = '';
+										}}
+									/>
+								{:else}
+									<button
+										class={[
+											'group flex shrink-0 items-center gap-1 rounded-field px-2 py-1 text-sm font-semibold tabular-nums transition-colors hover:bg-base-200',
+											schedule.amount > 0 ? 'text-success' : 'text-error'
+										]}
+										title="Change future amount"
+										disabled={saving}
+										onclick={() => {
+											editingAmountId = schedule.id;
+											editingAmountValue = String(Math.abs(schedule.amount));
+										}}
+									>
+										{formatSignedCurrency(schedule.amount, group.currency)}
+										<Icon
+											name="pencil"
+											class="size-3 text-base-content/30 group-hover:text-base-content/60"
 										/>
-									{:else}
-										<button
-											class="font-semibold text-sm shrink-0 tabular-nums {schedule.amount < 0 ? 'text-error' : 'text-success'} hover:opacity-60 transition-opacity"
-											title="Click to change future amount"
-											disabled={saving}
-											onclick={() => {
-												editingAmountId = schedule.id;
-												editingAmountValue = String(Math.abs(schedule.amount));
-											}}
-										>
-											{schedule.amount < 0 ? '−' : '+'}{formatCurrency(Math.abs(schedule.amount), group.currency)}
-										</button>
-									{/if}
+									</button>
+								{/if}
 
+								<div class="ml-12 flex items-center gap-2 sm:ml-0">
 									<!-- Day picker -->
-									<div class="flex items-center gap-1 shrink-0">
-										<span class="text-xs text-base-content/40">day</span>
-										<select
-											class="select select-bordered select-xs w-16"
-											value={String(schedule.recur_day || 1)}
-											disabled={saving}
-											onchange={(e) => changeDay(schedule, Number(e.currentTarget.value))}
-										>
-											{#each dayOptions as opt (opt.value)}
-												<option value={opt.value}>{opt.label}</option>
-											{/each}
-										</select>
-									</div>
+									<select
+										class="select w-24 select-sm"
+										aria-label="Day of month"
+										value={String(schedule.recur_day || 1)}
+										disabled={saving}
+										onchange={(e) => changeDay(schedule, Number(e.currentTarget.value))}
+									>
+										{#each dayOptions as opt (opt.value)}
+											<option value={opt.value}>Day {opt.label}</option>
+										{/each}
+									</select>
 
 									<!-- Active toggle -->
 									<input
 										type="checkbox"
-										class="toggle toggle-xs toggle-success"
+										class="toggle toggle-sm toggle-success"
 										checked={schedule.active}
 										disabled={saving}
+										aria-label={schedule.active ? 'Pause schedule' : 'Resume schedule'}
 										title={schedule.active ? 'Pause schedule' : 'Resume schedule'}
 										onchange={() => toggleActive(schedule)}
 									/>
 
 									<!-- Remove schedule button -->
 									<button
-										class="btn btn-ghost btn-xs text-base-content/30 hover:text-error"
+										class="btn btn-square text-base-content/45 btn-ghost btn-sm hover:text-error"
 										title="Remove recurring schedule"
+										aria-label="Remove recurring schedule"
 										disabled={saving}
 										onclick={() => (scheduleToRemove = schedule)}
 									>
 										{#if saving}
-											<span class="loading loading-spinner loading-xs"></span>
+											<span class="loading loading-xs loading-spinner"></span>
 										{:else}
-											<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
-												<path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-											</svg>
+											<Icon name="trash" class="size-4" />
 										{/if}
 									</button>
 								</div>
-							{/each}
-						</div>
+							</div>
+						{/each}
 					</div>
-				</div>
+				</section>
 			{/each}
 		{/if}
 	</div>
 
 	<Modal
 		open={!!scheduleToRemove}
-		title="Remove Recurring Schedule?"
+		title="Remove recurring schedule?"
 		onclose={() => (scheduleToRemove = null)}
 	>
-		<p class="text-base-content/70">
+		<p class="text-sm text-base-content/70">
 			<strong>{scheduleToRemove?.description || scheduleToRemove?.category}</strong> will no longer
 			repeat monthly. Past transactions are not affected.
 		</p>
 		{#snippet actions()}
 			<Button variant="ghost" onclick={() => (scheduleToRemove = null)}>Cancel</Button>
-			<Button variant="error" onclick={confirmRemove}>Remove Schedule</Button>
+			<Button variant="error" onclick={confirmRemove}>Remove schedule</Button>
 		{/snippet}
 	</Modal>
 </AuthGuard>

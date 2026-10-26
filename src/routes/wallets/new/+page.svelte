@@ -15,8 +15,32 @@
 	import BudgetCategoryList from '$lib/components/BudgetCategoryList.svelte';
 	import { validateCategories } from '$lib/validation/budget';
 	import { CURRENCIES } from '$lib/settings';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import Icon from '$lib/components/Icon.svelte';
+
+	const STEPS = [
+		{ id: 'preset', label: 'Template' },
+		{ id: 'customize', label: 'Categories' },
+		{ id: 'details', label: 'Details' }
+	] as const;
+
+	const BUDGET_TYPES = [
+		{
+			value: 'percentage',
+			symbol: '%',
+			label: 'Percent of income',
+			description: 'Split whatever comes in, e.g. 50% needs, 30% wants, 20% savings.'
+		},
+		{
+			value: 'fixed',
+			symbol: '$',
+			label: 'Fixed amounts',
+			description: 'Set a monthly spending limit for each category.'
+		}
+	] as const;
 
 	let step = $state<'preset' | 'customize' | 'details'>('preset');
+	const stepIndex = $derived(STEPS.findIndex((s) => s.id === step));
 	let name = $state('');
 	let balance = $state<number | ''>(0);
 	let currency = $state('USD');
@@ -96,155 +120,201 @@
 </script>
 
 <svelte:head>
-	<title>Create Wallet - MC Budget</title>
+	<title>New Wallet - MC Budget</title>
 </svelte:head>
 
 <AuthGuard>
-	{#snippet children()}
-		<div class="max-w-4xl mx-auto">
-			<h1 class="text-2xl font-bold mb-6">Create New Wallet</h1>
+	<div class="mx-auto max-w-4xl">
+		<PageHeader
+			title="New wallet"
+			subtitle="Pick a budget style, tune the categories, then name your wallet."
+			backHref={resolve('/wallets')}
+			backLabel="Wallets"
+		/>
 
-			{#if error}
-				<Alert type="error" dismissible ondismiss={() => (error = '')} class="mb-6">
-					{#snippet children()}{error}{/snippet}
-				</Alert>
-			{/if}
+		{#if error}
+			<Alert type="error" dismissible ondismiss={() => (error = '')} class="mb-6">
+				{error}
+			</Alert>
+		{/if}
 
-			<!-- Progress Steps -->
-			<ul class="steps steps-horizontal w-full mb-8">
-				<li
-					class="step {step === 'preset' || step === 'customize' || step === 'details'
-						? 'step-primary'
-						: ''}"
-				>
-					Choose Template
-				</li>
-				<li class="step {step === 'customize' || step === 'details' ? 'step-primary' : ''}">
-					Customize Budget
-				</li>
-				<li class="step {step === 'details' ? 'step-primary' : ''}">Wallet Details</li>
-			</ul>
-
-			{#if step === 'preset'}
-				<div class="space-y-6">
-					<p class="text-base-content/70">
-						{#if budgetType === 'fixed'}
-							Choose a category template to get started, or build from scratch.
+		<!-- Progress Steps -->
+		<ol class="mb-8 grid grid-cols-3 gap-2">
+			{#each STEPS as s, i (s.id)}
+				{@const done = i < stepIndex}
+				{@const current = i === stepIndex}
+				<li class="min-w-0">
+					<div
+						class={[
+							'h-1 rounded-full transition-colors',
+							done || current ? 'bg-primary' : 'bg-base-300'
+						]}
+					></div>
+					<p
+						class={[
+							'mt-2 flex items-center gap-1.5 truncate text-xs font-medium sm:text-sm',
+							current ? 'text-base-content' : 'text-base-content/45'
+						]}
+					>
+						{#if done}
+							<Icon name="circle-check" class="size-4 text-primary" />
 						{:else}
-							Choose a budget template to get started, or create a custom budget.
+							<span class="text-base-content/40 tabular-nums">{i + 1}.</span>
 						{/if}
+						{s.label}
 					</p>
+				</li>
+			{/each}
+		</ol>
 
-					<!-- Budget type selection -->
-					<div class="flex gap-2">
+		{#if step === 'preset'}
+			<div class="space-y-6">
+				<!-- Budget type selection -->
+				<div class="grid gap-3 sm:grid-cols-2">
+					{#each BUDGET_TYPES as t (t.value)}
 						<button
 							type="button"
-							class={['btn btn-sm flex-1', budgetType === 'percentage' ? 'btn-primary' : 'btn-ghost']}
-							onclick={() => (budgetType = 'percentage')}
+							class={[
+								'surface flex items-start gap-3 p-4 text-left transition-all',
+								budgetType === t.value
+									? 'border-primary ring-2 ring-primary/20'
+									: 'hover:border-base-content/20'
+							]}
+							onclick={() => (budgetType = t.value)}
+							aria-pressed={budgetType === t.value}
 						>
-							% of Income
+							<span
+								class={[
+									'grid size-9 shrink-0 place-items-center rounded-lg text-sm font-bold',
+									budgetType === t.value
+										? 'bg-primary text-primary-content'
+										: 'bg-base-200 text-base-content/60'
+								]}
+							>
+								{t.symbol}
+							</span>
+							<span>
+								<span class="block font-semibold">{t.label}</span>
+								<span class="mt-0.5 block text-sm text-base-content/55">{t.description}</span>
+							</span>
 						</button>
-						<button
-							type="button"
-							class={['btn btn-sm flex-1', budgetType === 'fixed' ? 'btn-primary' : 'btn-ghost']}
-							onclick={() => (budgetType = 'fixed')}
-						>
-							Fixed Amounts
-						</button>
-					</div>
+					{/each}
+				</div>
 
+				<div>
+					<h2 class="mb-3 text-sm font-semibold">
+						{budgetType === 'fixed' ? 'Start from a category template' : 'Choose a template'}
+					</h2>
 					<BudgetPresetSelector
 						{presets}
 						selected={selectedPresetId}
 						{budgetType}
 						onselect={handlePresetSelect}
 					/>
-
-					<div class="divider">OR</div>
-
-					<button type="button" class="btn btn-outline w-full" onclick={handleCustomBudget}>
-						Create Custom Budget
-					</button>
 				</div>
-			{:else if step === 'customize'}
-				<Card title="Customize Your Budget">
-					{#snippet children()}
-						<p class="text-base-content/70 mb-4">
-							{#if budgetType === 'fixed'}
-								Set a fixed monthly spending limit for each category.
-							{:else}
-								Adjust categories and percentages. Total must equal 100%.
-							{/if}
-						</p>
 
-						<BudgetCategoryList bind:categories editable {budgetType} />
+				<div class="divider text-xs text-base-content/45">OR</div>
 
-						<div class="flex gap-2 mt-6">
-							<Button variant="ghost" onclick={() => (step = 'preset')}>Back</Button>
-							<Button
-								variant="primary"
-								class="flex-1"
-								disabled={!categoriesValid}
-								onclick={() => (step = 'details')}
-							>
-								Continue
-							</Button>
-						</div>
-					{/snippet}
-				</Card>
-			{:else if step === 'details'}
-				<Card title="Wallet Details">
-					{#snippet children()}
-						<form onsubmit={handleSubmit} class="space-y-4">
-							<Input
-								type="text"
-								label="Wallet Name"
-								bind:value={name}
-								placeholder="e.g., Main Budget, Savings"
-								required
-							/>
+				<button
+					type="button"
+					class="btn w-full border-dashed border-base-300 btn-ghost"
+					onclick={handleCustomBudget}
+				>
+					<Icon name="plus" class="size-4" />
+					Start from scratch
+				</button>
+			</div>
+		{:else if step === 'customize'}
+			<Card
+				title="Customize your budget"
+				subtitle={budgetType === 'fixed'
+					? 'Set a fixed monthly spending limit for each category.'
+					: 'Adjust categories and percentages. The total must equal 100%.'}
+			>
+				<BudgetCategoryList bind:categories editable {budgetType} />
 
-							<Input
-								type="number"
-								label="Starting Balance"
-								bind:value={balance}
-								placeholder="0.00"
-								min="0"
-								step="0.01"
-								required
-							/>
+				<div class="mt-6 flex gap-2">
+					<Button variant="ghost" icon="arrow-left" onclick={() => (step = 'preset')}>Back</Button>
+					<Button
+						variant="primary"
+						class="flex-1"
+						disabled={!categoriesValid}
+						onclick={() => (step = 'details')}
+					>
+						Continue
+					</Button>
+				</div>
+			
+			</Card>
+		{:else if step === 'details'}
+			<Card title="Wallet details" subtitle="You can't change the budget split after this step.">
+				<form onsubmit={handleSubmit} class="space-y-4">
+					<Input
+						type="text"
+						label="Wallet name"
+						bind:value={name}
+						placeholder="e.g. Main budget, Savings"
+						required
+					/>
 
-							<Select
-								label="Currency"
-								bind:value={currency}
-								options={CURRENCIES}
-								required
-							/>
+					<div class="grid gap-4 sm:grid-cols-2">
+						<Input
+							type="number"
+							label="Starting balance"
+							bind:value={balance}
+							placeholder="0.00"
+							min="0"
+							step="0.01"
+							required
+						/>
 
-							<div class="bg-base-200 p-4 rounded-lg">
-								<h4 class="font-medium mb-2">Budget Summary</h4>
-								<div class="flex flex-wrap gap-2">
-									{#each categories as category (category.name)}
+						<Select label="Currency" bind:value={currency} options={CURRENCIES} required />
+					</div>
+
+					<div class="rounded-box bg-base-200/60 p-4">
+						<p class="eyebrow mb-3">Budget summary</p>
+						{#if budgetType === 'percentage'}
+							<div class="mb-3 flex h-2 gap-0.5 overflow-hidden rounded-full">
+								{#each categories as category (category.name)}
+									<div
+										class="h-full"
+										style:width="{category.percentage}%"
+										style:background-color={category.color}
+									></div>
+								{/each}
+							</div>
+						{/if}
+						<div class="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+							{#each categories as category (category.name)}
+								<div class="flex items-center justify-between gap-2 text-sm">
+									<span class="flex min-w-0 items-center gap-2">
 										<span
-											class="badge"
-											style="background-color: {category.color}; color: white;"
-										>
-											{category.name}: {budgetType === "fixed" ? (category.fixedAmount ?? 0) : category.percentage + "%"}
-										</span>
-									{/each}
+											class="size-2.5 shrink-0 rounded-full"
+											style:background-color={category.color}
+										></span>
+										<span class="truncate">{category.name}</span>
+									</span>
+									<span class="font-medium tabular-nums">
+										{budgetType === 'fixed'
+											? (category.fixedAmount ?? 0).toFixed(2)
+											: category.percentage + '%'}
+									</span>
 								</div>
-							</div>
+							{/each}
+						</div>
+					</div>
 
-							<div class="flex gap-2 mt-6">
-								<Button variant="ghost" onclick={() => (step = 'customize')}>Back</Button>
-								<Button type="submit" variant="primary" class="flex-1" {loading}>
-									Create Wallet
-								</Button>
-							</div>
-						</form>
-					{/snippet}
-				</Card>
-			{/if}
-		</div>
-	{/snippet}
+					<div class="flex gap-2 pt-2">
+						<Button variant="ghost" icon="arrow-left" onclick={() => (step = 'customize')}>
+							Back
+						</Button>
+						<Button type="submit" variant="primary" class="flex-1" {loading}>
+							Create wallet
+						</Button>
+					</div>
+				</form>
+			
+			</Card>
+		{/if}
+	</div>
 </AuthGuard>

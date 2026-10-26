@@ -20,8 +20,8 @@
 </script>
 
 {#if auth.isLoading}
-	<div class="flex justify-center items-center min-h-[200px]">
-		<span class="loading loading-spinner loading-lg"></span>
+	<div class="grid min-h-[50vh] place-items-center" role="status" aria-label="Loading">
+		<span class="loading loading-lg loading-spinner text-primary"></span>
 	</div>
 {:else if auth.isAuthenticated}
 	{@render children()}

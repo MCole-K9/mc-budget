@@ -8,34 +8,17 @@
 		class?: ClassValue;
 	}
 
-	let {
-		label,
-		error,
-		hint,
-		value = $bindable(),
-		class: className,
-		...rest
-	}: Props = $props();
+	let { label, error, hint, value = $bindable(), class: className, ...rest }: Props = $props();
 </script>
 
-<div class="form-control w-full">
+<label class="flex w-full flex-col gap-1.5">
 	{#if label}
-		<div class="label">
-			<span class="label-text">{label}</span>
-		</div>
+		<span class="text-sm font-medium text-base-content/80">{label}</span>
 	{/if}
-	<input
-		class={['input input-bordered w-full', error && 'input-error', className]}
-		bind:value
-		{...rest}
-	/>
+	<input class={['input w-full', error && 'input-error', className]} bind:value {...rest} />
 	{#if error}
-		<div class="label">
-			<span class="label-text-alt text-error">{error}</span>
-		</div>
+		<span class="text-xs text-error">{error}</span>
 	{:else if hint}
-		<div class="label">
-			<span class="label-text-alt">{hint}</span>
-		</div>
+		<span class="text-xs text-base-content/50">{hint}</span>
 	{/if}
-</div>
+</label>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { BudgetCategory } from '$lib/types/budget';
+	import Icon from './Icon.svelte';
 
 	interface Props {
 		category: BudgetCategory;
@@ -15,22 +16,30 @@
 	}
 </script>
 
-<div class="flex items-center gap-2 p-2 bg-base-200 rounded-lg">
-	<input
-		type="color"
-		bind:value={category.color}
-		onchange={handleChange}
-		class="w-10 h-10 rounded cursor-pointer border-0"
-	/>
+<div class="flex items-center gap-2 rounded-field border border-base-300/70 bg-base-100 p-1.5">
+	<label
+		class="relative size-9 shrink-0 cursor-pointer rounded-lg ring-1 ring-black/5 ring-inset"
+		style:background-color={category.color}
+		title="Change color"
+	>
+		<input
+			type="color"
+			bind:value={category.color}
+			onchange={handleChange}
+			class="absolute inset-0 cursor-pointer opacity-0"
+			aria-label="Category color"
+		/>
+	</label>
 	<input
 		type="text"
 		bind:value={category.name}
 		onchange={handleChange}
 		placeholder="Category name"
-		class="input input-sm input-bordered flex-1"
+		aria-label="Category name"
+		class="input input-sm min-w-0 flex-1 border-transparent bg-transparent shadow-none focus:border-base-300"
 	/>
 	{#if budgetType === 'fixed'}
-		<div class="flex items-center gap-1">
+		<label class="input input-sm w-32 shrink-0">
 			<input
 				type="number"
 				bind:value={category.fixedAmount}
@@ -38,11 +47,12 @@
 				min="0"
 				step="0.01"
 				placeholder="0.00"
-				class="input input-sm input-bordered w-28 text-right"
+				aria-label="Fixed amount"
+				class="text-right tabular-nums"
 			/>
-		</div>
+		</label>
 	{:else}
-		<div class="flex items-center gap-1">
+		<label class="input input-sm w-24 shrink-0">
 			<input
 				type="number"
 				bind:value={category.percentage}
@@ -50,18 +60,20 @@
 				min="0"
 				max="100"
 				step="1"
-				class="input input-sm input-bordered w-20 text-right"
+				aria-label="Percentage"
+				class="text-right tabular-nums"
 			/>
-			<span class="text-sm">%</span>
-		</div>
+			<span class="text-base-content/50">%</span>
+		</label>
 	{/if}
 	{#if onremove}
 		<button
 			type="button"
-			class="btn btn-sm btn-ghost btn-circle text-error"
+			class="btn btn-square text-base-content/40 btn-ghost btn-sm hover:text-error"
 			onclick={onremove}
+			aria-label="Remove category"
 		>
-			✕
+			<Icon name="trash" class="size-4" />
 		</button>
 	{/if}
 </div>

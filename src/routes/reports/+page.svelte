@@ -1,11 +1,17 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import { getWallets, getWallet } from '$lib/wallets.remote';
 	import { getReport } from '$lib/transactions.remote';
 	import { getFinancialSettings, getExchangeRates } from '$lib/settings.remote';
 	import { getStandardPeriodRange, formatShortDate, formatMonthLabel } from '$lib/utils/dateRange';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import ChartCanvas from '$lib/components/ChartCanvas.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import PeriodFilter from '$lib/components/PeriodFilter.svelte';
+	import IncomeExpenseStats from '$lib/components/IncomeExpenseStats.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import Card from '$lib/components/Card.svelte';
+	import Alert from '$lib/components/Alert.svelte';
+	import { formatCurrency } from '$lib/utils/format';
 	import type { ChartConfiguration } from 'chart.js';
 
 	const PERIODS: { value: string; label: string }[] = [
@@ -21,7 +27,6 @@
 	let selectedWalletId = $state('');
 	let customStartDate = $state('');
 	let customEndDate = $state('');
-	const showDateInputs = $derived(selectedPeriod === 'custom');
 
 	const wallets = await getWallets();
 	const { baseCurrency } = await getFinancialSettings();
@@ -64,12 +69,8 @@
 			income += data.income / r;
 			expense += data.expense / r;
 		}
-		return { income, expense, net: income - expense };
+		return { income, expense };
 	})());
-
-	function formatCurrency(amount: number, currency: string): string {
-		return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(amount);
-	}
 
 	const formatDate = formatShortDate;
 
@@ -85,14 +86,18 @@
 					data: entries.map(([, v]) => v.spent),
 					backgroundColor: entries.map(([, v]) => v.color + 'cc'),
 					borderColor: entries.map(([, v]) => v.color),
-					borderWidth: 1
+					borderWidth: 1,
+					hoverOffset: 6
 				}]
 			};
 		})(),
 		options: {
-			cutout: '65%',
+			cutout: '70%',
 			plugins: {
-				legend: { position: 'right', labels: { boxWidth: 12, padding: 12, font: { size: 12 } } },
+				legend: {
+					position: 'bottom',
+					labels: { boxWidth: 10, padding: 14, usePointStyle: true, font: { size: 12 } }
+				},
 				tooltip: {
 					callbacks: {
 						label: (ctx) => ` ${formatCurrency(ctx.parsed, primaryCurrency)}`
@@ -216,160 +221,124 @@
 </svelte:head>
 
 <AuthGuard>
-	{#snippet children()}
-		<div class="max-w-4xl mx-auto space-y-5">
-
-			<!-- Header -->
-			<div class="flex justify-between items-end">
-				<div>
-					<a href={resolve('/wallets')} class="btn btn-ghost btn-sm mb-3 -ml-3">&larr; Wallets</a>
-					<h1 class="text-2xl font-bold">Reports</h1>
-				</div>
-
-				<!-- Wallet filter -->
-				<div class="flex items-center gap-2">
-					<span class="text-xs text-base-content/40 uppercase tracking-wider font-medium">Wallet</span>
-					<select
-						class="select select-bordered select-sm"
-						value={selectedWalletId}
-						onchange={(e) => (selectedWalletId = e.currentTarget.value)}
-					>
-						<option value="">All Wallets</option>
-						{#each wallets as w (w.id)}
-							<option value={w.id}>{w.name}</option>
-						{/each}
-					</select>
-				</div>
-			</div>
-
-			<!-- Period selector -->
-			<div class="space-y-2">
-				<div class="flex flex-wrap gap-1">
-					{#each PERIODS as p (p.value)}
-						<button
-							class={['btn btn-sm', selectedPeriod === p.value ? 'btn-primary' : 'btn-ghost']}
-							onclick={() => (selectedPeriod = p.value)}
-						>
-							{p.label}
-						</button>
+	<PageHeader title="Reports" subtitle="Where your money came from and where it went.">
+		{#snippet actions()}
+			<label class="flex items-center gap-2">
+				<span class="sr-only">Wallet</span>
+				<select
+					class="select w-48 select-sm"
+					value={selectedWalletId}
+					onchange={(e) => (selectedWalletId = e.currentTarget.value)}
+				>
+					<option value="">All wallets</option>
+					{#each wallets as w (w.id)}
+						<option value={w.id}>{w.name}</option>
 					{/each}
-				</div>
-				{#if showDateInputs}
-					<div class="flex items-center gap-2">
-						<input type="date" class="input input-bordered input-sm flex-1" value={customStartDate}
-							oninput={(e) => (customStartDate = e.currentTarget.value)} />
-						<span class="text-base-content/50 text-sm shrink-0">to</span>
-						<input type="date" class="input input-bordered input-sm flex-1" value={customEndDate}
-							oninput={(e) => (customEndDate = e.currentTarget.value)} />
+				</select>
+			</label>
+		{/snippet}
+	</PageHeader>
+
+	<div class="space-y-6">
+		<PeriodFilter
+			periods={PERIODS}
+			value={selectedPeriod}
+			onselect={(p) => (selectedPeriod = p)}
+			startDate={customStartDate}
+			endDate={customEndDate}
+			ondateschange={(r) => {
+				customStartDate = r.startDate;
+				customEndDate = r.endDate;
+			}}
+		/>
+
+		<!-- Summary stat cards -->
+		{#if summaryEntries.length > 0}
+			<div class="space-y-3">
+				{#each summaryEntries as [currency, { income, expense }] (currency)}
+					<IncomeExpenseStats
+						{income}
+						{expense}
+						{currency}
+						labelSuffix={multiCurrency ? currency : ''}
+					/>
+				{/each}
+				{#if showConvertedTotal}
+					<div class="border-t border-base-300/60 pt-3">
+						<IncomeExpenseStats
+							muted
+							income={convertedTotal.income}
+							expense={convertedTotal.expense}
+							currency={baseCurrency}
+							labelSuffix="{baseCurrency} total"
+						/>
 					</div>
 				{/if}
+				{#if ratesMissing}
+					<Alert type="warning">
+						Exchange rates are unavailable right now, so totals are not combined into {baseCurrency}.
+						The monthly trend shows {primaryCurrency} only.
+					</Alert>
+				{/if}
 			</div>
+		{/if}
 
-			<!-- Summary stat cards -->
-			{#if summaryEntries.length > 0}
-				{#each summaryEntries as [currency, { income, expense }] (currency)}
-					{@const net = income - expense}
-					<div class="grid grid-cols-3 gap-3">
-						<div class="rounded-2xl bg-base-100 shadow-sm p-4">
-							<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-1">Income</p>
-							<p class="text-xl font-bold text-success tabular-nums">{formatCurrency(income, currency)}</p>
-						</div>
-						<div class="rounded-2xl bg-base-100 shadow-sm p-4">
-							<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-1">Expenses</p>
-							<p class="text-xl font-bold text-error tabular-nums">{formatCurrency(expense, currency)}</p>
-						</div>
-						<div class="rounded-2xl bg-base-100 shadow-sm p-4">
-							<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-1">Net</p>
-							<p class="text-xl font-bold tabular-nums {net >= 0 ? 'text-success' : 'text-error'}">
-								{net >= 0 ? '+' : ''}{formatCurrency(Math.abs(net), currency)}
-							</p>
-						</div>
+		<!-- Charts row: Donut + Budget vs Actual -->
+		{#if hasSpending}
+			<div class={['grid gap-4', budgetVsActualConfig ? 'lg:grid-cols-2' : 'grid-cols-1']}>
+				<Card title="Spending by category" subtitle={primaryCurrency}>
+					<div class="mx-auto flex max-w-sm items-center justify-center">
+						<ChartCanvas config={donutConfig} class="max-h-72" />
 					</div>
-				{/each}
-			{#if showConvertedTotal}
-				{@const net = convertedTotal.net}
-				<div class="grid grid-cols-3 gap-3 border-t border-base-200/60 pt-3">
-					<div class="rounded-2xl bg-base-200/40 p-4">
-						<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-1">Total Income ({baseCurrency})</p>
-						<p class="text-xl font-bold text-success tabular-nums">{formatCurrency(convertedTotal.income, baseCurrency)}</p>
-					</div>
-					<div class="rounded-2xl bg-base-200/40 p-4">
-						<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-1">Total Expenses ({baseCurrency})</p>
-						<p class="text-xl font-bold text-error tabular-nums">{formatCurrency(convertedTotal.expense, baseCurrency)}</p>
-					</div>
-					<div class="rounded-2xl bg-base-200/40 p-4">
-						<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-1">Total Net ({baseCurrency})</p>
-						<p class="text-xl font-bold tabular-nums {net >= 0 ? 'text-success' : 'text-error'}">
-							{net >= 0 ? '+' : ''}{formatCurrency(Math.abs(net), baseCurrency)}
-						</p>
-					</div>
-				</div>
-			{/if}
-			{#if ratesMissing}
-				<p class="text-xs text-base-content/50">
-					Exchange rates are unavailable right now, so totals are not combined into {baseCurrency}. The monthly trend shows {primaryCurrency} only.
-				</p>
-			{/if}
-			{/if}
+				</Card>
 
-			<!-- Charts row: Donut + Budget vs Actual -->
-			{#if hasSpending}
-				<div class={['grid gap-4', budgetVsActualConfig ? 'md:grid-cols-2' : 'grid-cols-1']}>
-					<!-- Spending by Category -->
-					<div class="rounded-2xl bg-base-100 shadow-sm p-5">
-						<p class="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-4">Spending by Category</p>
-						<div class="flex items-center justify-center" style="max-height: 260px;">
-							<ChartCanvas config={donutConfig} class="max-h-64" />
-						</div>
-					</div>
+				{#if budgetVsActualConfig}
+					<Card title="Budget vs actual" subtitle={walletData?.name}>
+						<ChartCanvas config={budgetVsActualConfig} class="max-h-72" />
+					</Card>
+				{/if}
+			</div>
+		{/if}
 
-					<!-- Budget vs Actual (wallet only) -->
-					{#if budgetVsActualConfig}
-						<div class="rounded-2xl bg-base-100 shadow-sm p-5">
-							<p class="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-4">Budget vs Actual</p>
-							<ChartCanvas config={budgetVsActualConfig} class="max-h-64" />
-						</div>
-					{/if}
-				</div>
-			{/if}
+		<!-- Income vs Expenses by Month -->
+		{#if hasMonthlyData}
+			<Card title="Income vs expenses" subtitle="By month · {trendCurrency}">
+				<ChartCanvas config={trendConfig} class="max-h-72" />
+			</Card>
+		{/if}
 
-			<!-- Income vs Expenses by Month -->
-			{#if hasMonthlyData}
-				<div class="rounded-2xl bg-base-100 shadow-sm p-5">
-					<p class="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-4">Income vs Expenses</p>
-					<ChartCanvas config={trendConfig} class="max-h-64" />
-				</div>
-			{/if}
-
-			<!-- Top 10 Expenses -->
-			{#if report.topExpenses.length > 0}
-				<div class="rounded-2xl bg-base-100 shadow-sm p-5">
-					<p class="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-4">Top Expenses</p>
-					<div class="divide-y divide-base-200/60">
-						{#each report.topExpenses as tx, i (tx.id)}
-							<div class="flex items-center gap-3 py-2.5">
-								<span class="text-xs font-semibold text-base-content/30 w-5 text-right shrink-0">{i + 1}</span>
-								<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {tx.color};"></span>
-								<div class="flex-1 min-w-0">
-									<p class="text-sm font-medium truncate">{tx.description || tx.category}</p>
-									<p class="text-xs text-base-content/40 truncate">{tx.category} · {tx.walletName} · {formatDate(tx.date)}</p>
-								</div>
-								<span class="text-sm font-semibold text-error tabular-nums shrink-0">
-									−{formatCurrency(tx.amount, tx.currency)}
-								</span>
+		<!-- Top 10 Expenses -->
+		{#if report.topExpenses.length > 0}
+			<Card title="Top expenses">
+				<ol class="-mx-2 divide-y divide-base-300/60">
+					{#each report.topExpenses as tx, i (tx.id)}
+						<li class="flex items-center gap-3 px-2 py-2.5">
+							<span class="w-5 shrink-0 text-right text-xs font-semibold text-base-content/35 tabular-nums">
+								{i + 1}
+							</span>
+							<span class="size-2.5 shrink-0 rounded-full" style:background-color={tx.color}></span>
+							<div class="min-w-0 flex-1">
+								<p class="truncate text-sm font-medium">{tx.description || tx.category}</p>
+								<p class="truncate text-xs text-base-content/50">
+									{tx.category} · {tx.walletName} · {formatDate(tx.date)}
+								</p>
 							</div>
-						{/each}
-					</div>
-				</div>
-			{/if}
+							<span class="shrink-0 text-sm font-semibold text-error tabular-nums">
+								−{formatCurrency(tx.amount, tx.currency)}
+							</span>
+						</li>
+					{/each}
+				</ol>
+			</Card>
+		{/if}
 
-			<!-- Empty state -->
-			{#if !hasSpending && !hasMonthlyData && summaryEntries.length === 0}
-				<div class="rounded-2xl bg-base-100 shadow-sm p-12 text-center">
-					<p class="text-base-content/40 text-sm">No data in this period.</p>
-				</div>
-			{/if}
-
-		</div>
-	{/snippet}
+		<!-- Empty state -->
+		{#if !hasSpending && !hasMonthlyData && summaryEntries.length === 0}
+			<EmptyState
+				icon="chart"
+				title="No data in this period"
+				description="Pick a longer period or another wallet to see your reports."
+			/>
+		{/if}
+	</div>
 </AuthGuard>
