@@ -17,3 +17,10 @@ export async function fetchRates(baseCurrency: string): Promise<Record<string, n
 	}
 	return { [base]: 1 }; // graceful fallback: no conversion
 }
+
+/** Units of `to` per one unit of `from`, or null when no usable rate is available. */
+export async function getExchangeRate(from: string, to: string): Promise<number | null> {
+	if (from.toUpperCase() === to.toUpperCase()) return 1;
+	const rate = (await fetchRates(from))[to.toUpperCase()];
+	return typeof rate === 'number' && isFinite(rate) && rate > 0 ? rate : null;
+}

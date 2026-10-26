@@ -260,6 +260,7 @@ migrate(
 | `transactions.remote.ts` | getTransactions, createTransaction, deleteTransaction |
 | `presets.remote.ts`      | getPresets (prerendered), getPreset                   |
 | `auth.remote.ts`         | login (form), register (form), logout, refreshAuth    |
+| `budgetCovers.remote.ts` | getCategoryBudgetsForDate, coverOverage, removeBudgetCover |
 
 ## Validation Rules
 

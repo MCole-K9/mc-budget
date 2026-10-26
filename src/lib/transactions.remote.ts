@@ -2,12 +2,10 @@ import { z } from 'zod';
 import { query, command, form } from '$app/server';
 import { invalid } from '@sveltejs/kit';
 import { getPb } from '$lib/server/db';
+import { computeWalletSummary } from '$lib/server/walletSummary';
 import { TransactionSchema, WalletSchema, UpdateTransactionInputSchema } from '$lib/schemas/budget';
-import {
-	computeWalletPatch,
-	computeTransferDeleteDeltas,
-	computeTransactionDeletePatch
-} from '$lib/utils/balance';
+import { computeWalletPatch, computeTransactionDeletePatch } from '$lib/utils/balance';
+import { deleteTransferWithCovers } from '$lib/server/budgetCovers';
 import { getWallet } from '$lib/wallets.remote';
 
 export const getTransactions = query(z.string(), async (walletId) => {
@@ -25,52 +23,9 @@ const GetTransactionSummarySchema = z.object({
 	endDate: z.string().optional()
 });
 
-export const getTransactionSummary = query(GetTransactionSummarySchema, async (input) => {
-	const walletFilter = `wallet = "${input.walletId}"`;
-	const endOfDay = `${input.endDate} 23:59:59.999Z`;
-	let filter = walletFilter;
-	if (input.startDate) filter += ` && date >= "${input.startDate}"`;
-	if (input.endDate) filter += ` && date <= "${endOfDay}"`;
-
-	const [records, laterRecords] = await Promise.all([
-		getPb().collection('transactions').getFullList({
-			filter,
-			fields: 'amount,category,transfer_id,balance_adjustment',
-			requestKey: null
-		}),
-		// Dated after the period: subtracted from the current balance to get the period's closing balance
-		input.endDate
-			? getPb().collection('transactions').getFullList({
-					filter: `${walletFilter} && date > "${endOfDay}"`,
-					fields: 'amount',
-					requestKey: null
-				})
-			: Promise.resolve([])
-	]);
-	const netAfterEnd = laterRecords.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-
-	let income = 0;
-	let transfersOut = 0;
-	const spendingByCategory: Record<string, number> = {};
-
-	for (const r of records) {
-		const amount = Number(r.amount) || 0;
-		if (r.balance_adjustment) continue;
-		if (r.transfer_id) {
-			if (amount > 0) income += amount;
-			else transfersOut += Math.abs(amount);
-			continue;
-		}
-		if (amount > 0) {
-			income += amount;
-		} else {
-			const cat = String(r.category).toLowerCase();
-			spendingByCategory[cat] = (spendingByCategory[cat] ?? 0) + Math.abs(amount);
-		}
-	}
-
-	return { income, transfersOut, spendingByCategory, netAfterEnd };
-});
+export const getTransactionSummary = query(GetTransactionSummarySchema, (input) =>
+	computeWalletSummary(getPb(), input)
+);
 
 const GetTransactionsPagedSchema = z.object({
 	walletId: z.string(),
@@ -483,98 +438,10 @@ export const deleteTransaction = command(
 
 		// If this is a transfer, also delete and reverse the linked counterpart
 		if (transaction.transfer_id) {
-			const linked = (await pb.collection('transactions').getFullList({
-				filter: `transfer_id = "${transaction.transfer_id}" && id != "${id}"`,
-				requestKey: null
-			})).map((r) => TransactionSchema.parse(r));
+			// A cover funded by this transfer goes with it: it would have no money behind it
+			const touchedWalletIds = await deleteTransferWithCovers(pb, transaction.transfer_id);
 
-			const transferTransactions = [transaction, ...linked];
-			const walletSnapshots = new Map<string, { balance: number; total_funded: number }>();
-			const touchedWallets = new Set<string>();
-			const deletedTransactions: typeof transferTransactions = [];
-
-			for (const tx of transferTransactions) {
-				if (!walletSnapshots.has(tx.wallet)) {
-					const w = WalletSchema.parse(
-						await pb.collection('wallets').getOne(tx.wallet, { requestKey: null })
-					);
-					walletSnapshots.set(tx.wallet, {
-						balance: w.balance,
-						total_funded: w.total_funded
-					});
-				}
-			}
-
-			const walletDeltas = computeTransferDeleteDeltas(transferTransactions);
-
-			// For each wallet, compute how much to reverse from total_funded (positive credits)
-			const totalFundedDeltas = new Map<string, number>();
-			for (const tx of transferTransactions) {
-				if (tx.amount > 0) {
-					totalFundedDeltas.set(tx.wallet, (totalFundedDeltas.get(tx.wallet) ?? 0) - tx.amount);
-				}
-			}
-
-			try {
-				for (const [walletToUpdate, balanceDelta] of walletDeltas) {
-					const snapshot = walletSnapshots.get(walletToUpdate);
-					if (!snapshot) throw new Error('Missing wallet snapshot during transfer delete');
-					const totalFundedDelta = totalFundedDeltas.get(walletToUpdate);
-					await pb.collection('wallets').update(walletToUpdate, {
-						balance: snapshot.balance + balanceDelta,
-						...(totalFundedDelta !== undefined && { total_funded: snapshot.total_funded + totalFundedDelta })
-					}, { requestKey: null });
-					touchedWallets.add(walletToUpdate);
-				}
-
-				for (const tx of transferTransactions) {
-					await pb.collection('transactions').delete(tx.id, { requestKey: null });
-					deletedTransactions.push(tx);
-				}
-			} catch (error) {
-				const rollbackErrors: string[] = [];
-
-				for (const walletToRestore of touchedWallets) {
-					const snapshot = walletSnapshots.get(walletToRestore);
-					if (!snapshot) continue;
-					try {
-						await pb.collection('wallets').update(walletToRestore, {
-							balance: snapshot.balance,
-							total_funded: snapshot.total_funded
-						}, { requestKey: null });
-					} catch {
-						rollbackErrors.push(`wallet rollback failed: ${walletToRestore}`);
-					}
-				}
-
-				for (const tx of deletedTransactions) {
-					try {
-						await pb.collection('transactions').create({
-							wallet: tx.wallet,
-							category: tx.category,
-							amount: tx.amount,
-							description: tx.description,
-							date: tx.date,
-							recurring: tx.recurring,
-							recur_day: tx.recur_day,
-							recurring_source_id: tx.recurring_source_id,
-							transfer_id: tx.transfer_id
-						}, { requestKey: null });
-					} catch {
-						rollbackErrors.push(`transaction rollback failed: ${tx.id}`);
-					}
-				}
-
-				if (rollbackErrors.length > 0) {
-					throw new Error(
-						`Delete transfer failed and rollback was incomplete (${rollbackErrors.join(', ')}).`
-					);
-				}
-
-				throw error;
-			}
-
-			for (const walletIdToRefresh of walletDeltas.keys()) {
+			for (const walletIdToRefresh of touchedWalletIds) {
 				getTransactions(walletIdToRefresh).refresh();
 				getWallet(walletIdToRefresh).refresh();
 			}

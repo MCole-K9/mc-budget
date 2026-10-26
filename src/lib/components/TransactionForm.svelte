@@ -2,7 +2,7 @@
 	import { untrack } from 'svelte';
 	import { createTransaction } from '$lib/transactions.remote';
 	import { scanReceipt } from '$lib/receipt.remote';
-	import type { Wallet } from '$lib/types/budget';
+	import type { Transaction, Wallet } from '$lib/types/budget';
 	import { todayYmd } from '$lib/utils/dateRange';
 	import Select from './Select.svelte';
 	import Input from './Input.svelte';
@@ -10,7 +10,7 @@
 
 	interface Props {
 		wallet: Wallet;
-		onSuccess?: () => void;
+		onSuccess?: (transaction: Transaction) => void;
 	}
 
 	let { wallet, onSuccess }: Props = $props();
@@ -46,7 +46,7 @@
 		const result = createTransaction.result;
 		if (result?.id && result.id !== lastResultId) {
 			lastResultId = result.id;
-			onSuccess?.();
+			onSuccess?.(result);
 		}
 	});
 

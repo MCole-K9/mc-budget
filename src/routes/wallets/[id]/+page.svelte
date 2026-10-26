@@ -20,7 +20,10 @@
 	import TransactionForm from '$lib/components/TransactionForm.svelte';
 	import EditTransactionForm from '$lib/components/EditTransactionForm.svelte';
 	import TransferForm from '$lib/components/TransferForm.svelte';
-	import { getStandardPeriodRange, getPayCycleRange, getPayCycleOffsetForDate, todayYmd } from '$lib/utils/dateRange';
+	import CoverOverageForm from '$lib/components/CoverOverageForm.svelte';
+	import { getCategoryBudgetsForDate, removeBudgetCover } from '$lib/budgetCovers.remote';
+	import { getStandardPeriodRange, getPayCycleRange, getPayCycleOffsetForDate, todayYmd, formatShortDate, isDateInRange } from '$lib/utils/dateRange';
+	import { getEffectiveIncome, getCategoryBudgets, OVERAGE_EPSILON, type CategoryBudget } from '$lib/utils/budget';
 
 	const BUILTIN_PERIODS: { value: string; label: string }[] = [
 		{ value: 'this-month', label: 'This Month' },
@@ -293,49 +296,97 @@
 		return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 	}
 
-	function getCategoryAmount(category: typeof wallet.categories[number]): number {
-		if (wallet.budget_type === "fixed") {
-			return category.fixedAmount ?? 0;
-		}
-		return (effectivePeriodIncome * category.percentage) / 100;
-	}
-
-	function inDateRange(date: string): boolean {
-		if (dateRange.startDate && date < dateRange.startDate) return false;
-		if (dateRange.endDate && date > dateRange.endDate) return false;
-		return true;
-	}
-
 	const periodLabel = $derived(
 		BUILTIN_PERIODS.find((p) => p.value === selectedPeriod)?.label ?? selectedPeriod
 	);
 
-	// Gross income for the selected period (before deducting transfers out).
-	// For 'all-time' use total_funded (initial_balance + all income + incoming transfers).
-	// For other periods: server-aggregated income + initial_balance if wallet was created in range.
-	const periodIncome = $derived(
-		selectedPeriod === 'all-time'
-			? wallet.total_funded
-			: summary.income + (inDateRange(wallet.created.split('T')[0].split(' ')[0]) ? wallet.initial_balance : 0)
-	);
+	// Income available for allocation in the selected period (see getEffectiveIncome)
+	const effectivePeriodIncome = $derived(getEffectiveIncome(wallet, summary, dateRange));
 
-	// Total expenses charged to categories in the current period.
-	const totalSpentThisPeriod = $derived(
-		Object.values(summary.spendingByCategory).reduce((s, v) => s + v, 0)
-	);
+	// Allocated / spent / remaining per category, in wallet.categories order, including covers
+	const categoryBudgets = $derived(getCategoryBudgets(wallet, summary, effectivePeriodIncome));
 
-	// Net income available for budget allocation.
-	// carry_forward mode: use the balance at the end of the period re-grossed by period spending (balance = what's left after spending).
-	// Normal mode: period income minus outgoing transfers, floored at 0.
-	const effectivePeriodIncome = $derived(
-		wallet.carry_forward
-			? Math.max(0, wallet.balance - summary.netAfterEnd + totalSpentThisPeriod)
-			: Math.max(0, periodIncome - summary.transfersOut)
-	);
+	type CoverRequest = {
+		category: string;
+		overage: number;
+		date: string;
+		periodText: string;
+		budgets: CategoryBudget[];
+	};
+	let coverRequest = $state<CoverRequest | null>(null);
 
-	// Spending per category for the selected period — from server-aggregated summary
-	function getCategorySpent(categoryName: string): number {
-		return summary.spendingByCategory[categoryName.toLowerCase()] ?? 0;
+	function describeRange(range: { startDate?: string; endDate?: string }): string {
+		if (!range.startDate && !range.endDate) return 'all time';
+		if (!range.startDate) return `up to ${formatShortDate(range.endDate!)}`;
+		if (!range.endDate) return `since ${formatShortDate(range.startDate)}`;
+		return `${formatShortDate(range.startDate)} – ${formatShortDate(range.endDate)}`;
+	}
+
+	type PeriodBudgets = Awaited<ReturnType<typeof getCategoryBudgetsForDate>>;
+
+	function findBudget(budgets: CategoryBudget[], name: string) {
+		return budgets.find((b) => b.name.toLowerCase() === name.toLowerCase());
+	}
+
+	function openCoverPrompt(budget: CategoryBudget, date: string, period: PeriodBudgets) {
+		coverRequest = {
+			category: budget.name,
+			overage: -budget.remaining,
+			date,
+			periodText: describeRange(period),
+			budgets: period.categories
+		};
+	}
+
+	// After saving an expense, offer to cover its category if this save pushed it over (or further
+	// over) in the default period containing the expense. `previous` is the expense before an edit.
+	async function promptCoverIfOver(tx: Transaction, previous?: Transaction) {
+		if (wallet.budget_type !== 'percentage' || tx.amount >= 0 || tx.transfer_id || tx.balance_adjustment) return;
+		try {
+			const period = await getCategoryBudgetsForDate({ walletId, date: tx.date, today: todayYmd() });
+			const budget = findBudget(period.categories, tx.category);
+			if (!budget || budget.remaining > -OVERAGE_EPSILON) return;
+			// Spending the previous version already put in this category and period
+			const alreadyCounted =
+				previous &&
+				previous.amount < 0 &&
+				previous.category.toLowerCase() === tx.category.toLowerCase() &&
+				isDateInRange(period, previous.date)
+					? Math.abs(previous.amount)
+					: 0;
+			if (Math.abs(tx.amount) - alreadyCounted <= OVERAGE_EPSILON) return;
+			openCoverPrompt(budget, tx.date, period);
+		} catch {
+			// The expense is saved either way; the prompt is only a convenience
+		}
+	}
+
+	// Cover button: covers are recorded in the default period, so check the one containing today,
+	// moved inside the period being viewed (e.g. its last day when viewing last month)
+	async function coverFromSelectedPeriod(categoryName: string) {
+		let date = todayYmd();
+		if (dateRange.endDate && date > dateRange.endDate) date = dateRange.endDate;
+		if (dateRange.startDate && date < dateRange.startDate) date = dateRange.startDate;
+		try {
+			const period = await getCategoryBudgetsForDate({ walletId, date, today: todayYmd() });
+			const budget = findBudget(period.categories, categoryName);
+			if (!budget || budget.remaining > -OVERAGE_EPSILON) {
+				error = `${categoryName} isn't over budget for ${describeRange(period)}, the budget period covers apply to.`;
+				return;
+			}
+			openCoverPrompt(budget, date, period);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to check the budget';
+		}
+	}
+
+	async function handleRemoveCover(id: string) {
+		try {
+			await removeBudgetCover({ id });
+			refreshPagedQuery();
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to remove cover';
+		}
 	}
 </script>
 
@@ -435,10 +486,12 @@
 						<p class="text-xs font-medium text-base-content/40 uppercase tracking-wider mb-5 pb-4 border-b border-base-200">Fixed monthly limits</p>
 					{/if}
 					<div class="space-y-4">
-						{#each wallet.categories as category (category.name)}
-							{@const allocated = getCategoryAmount(category)}
-							{@const spent = getCategorySpent(category.name)}
-							{@const remaining = allocated - spent}
+						{#each wallet.categories as category, i (category.name)}
+							{@const budget = categoryBudgets[i]}
+							{@const allocated = budget.allocated}
+							{@const spent = budget.spent}
+							{@const remaining = budget.remaining}
+							{@const covers = summary.covers.filter((c) => c.category.toLowerCase() === category.name.toLowerCase())}
 							{@const spentPct = allocated > 0 ? Math.min(100, (spent / allocated) * 100) : 0}
 							{@const overBudget = remaining < 0}
 							<div class="space-y-1">
@@ -460,6 +513,15 @@
 										{#if wallet.budget_type !== "fixed"}<span class="text-base-content/60">{category.percentage}%</span>{/if}
 										{#if overBudget}
 											<span class="badge badge-error badge-sm">Over budget</span>
+											{#if wallet.budget_type === 'percentage'}
+												<button
+													class="btn btn-ghost btn-xs"
+													onclick={() => coverFromSelectedPeriod(category.name)}
+													title="Choose a category or wallet to cover the overage"
+												>
+													Cover
+												</button>
+											{/if}
 										{/if}
 									</div>
 									<span class={['font-semibold', overBudget && 'text-error']}>
@@ -481,6 +543,22 @@
 										{formatCurrency(spent, wallet.currency)} spent
 									</span>
 								</div>
+								{#each covers as cover (cover.id + cover.direction)}
+									<div class="flex items-center gap-1 pl-6 text-xs text-base-content/50">
+										<span>
+											{cover.direction === 'in' ? '+' : '−'}{formatCurrency(cover.amount, wallet.currency)}
+											{cover.direction === 'in' ? 'covered by' : 'covering'}
+											{cover.counterpartCategory}{cover.counterpartWalletName ? ` (${cover.counterpartWalletName})` : ''}
+										</span>
+										<button
+											class="btn btn-ghost btn-xs px-1 opacity-50 hover:opacity-100"
+											onclick={() => handleRemoveCover(cover.id)}
+											title="Undo this cover"
+										>
+											×
+										</button>
+									</div>
+								{/each}
 							</div>
 						{/each}
 					</div>
@@ -704,9 +782,10 @@
 		<Modal bind:open={showAddTransaction} title="Add Transaction">
 			<TransactionForm
 					{wallet}
-					onSuccess={() => {
+					onSuccess={(tx) => {
 						showAddTransaction = false;
 						refreshPagedQuery();
+						promptCoverIfOver(tx);
 					}}
 				/>
 		</Modal>
@@ -815,12 +894,36 @@
 					<EditTransactionForm
 						transaction={transactionToEdit}
 						{wallet}
-						onSuccess={() => {
+						onSuccess={(tx) => {
+							const previous = transactionToEdit ?? undefined;
 							transactionToEdit = null;
 							refreshPagedQuery();
+							promptCoverIfOver(tx, previous);
 						}}
 						onCancel={() => (transactionToEdit = null)}
 					/>
 				{/if}
+		</Modal>
+
+		<!-- Cover Overage Modal -->
+		<Modal open={!!coverRequest} title="Cover Overage" onclose={() => (coverRequest = null)}>
+			{#if coverRequest}
+				<svelte:boundary>
+					{@const allWallets = await getWallets()}
+					<CoverOverageForm
+						{wallet}
+						{...coverRequest}
+						wallets={allWallets}
+						onCovered={() => {
+							coverRequest = null;
+							refreshPagedQuery();
+						}}
+						onSkip={() => (coverRequest = null)}
+					/>
+					{#snippet pending()}
+						<span class="loading loading-spinner"></span>
+					{/snippet}
+				</svelte:boundary>
+			{/if}
 		</Modal>
 </AuthGuard>

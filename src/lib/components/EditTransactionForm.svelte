@@ -9,7 +9,7 @@
 	interface Props {
 		transaction: Transaction;
 		wallet: Wallet;
-		onSuccess?: () => void;
+		onSuccess?: (transaction: Transaction) => void;
 		onCancel?: () => void;
 	}
 
@@ -38,7 +38,7 @@
 		submitting = true;
 		error = '';
 		try {
-			await updateTransaction({
+			const updated = await updateTransaction({
 				id: transaction.id,
 				walletId: transaction.wallet,
 				isExpense,
@@ -48,7 +48,7 @@
 				description: description || undefined,
 				date
 			});
-			onSuccess?.();
+			onSuccess?.(updated);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to update transaction';
 		} finally {

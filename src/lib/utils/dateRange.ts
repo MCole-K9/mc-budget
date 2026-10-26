@@ -16,6 +16,11 @@ export function toYmd(date: Date): string {
 	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** Whether a YYYY-MM-DD date falls inside the range (open ends are unbounded). */
+export function isDateInRange(range: DateRange, ymd: string): boolean {
+	return (!range.startDate || ymd >= range.startDate) && (!range.endDate || ymd <= range.endDate);
+}
+
 /** Today's date as a YYYY-MM-DD string in local time. */
 export function todayYmd(): string {
 	return toYmd(new Date());
@@ -94,6 +99,37 @@ export function getPayCycleOffsetForDate(targetDate: Date, cycleStartDay: number
 		if (targetStartMonth < 0) { targetStartMonth = 11; targetStartYear--; }
 	}
 	return (targetStartYear - now.getFullYear()) * 12 + (targetStartMonth - now.getMonth()) - baseOffset;
+}
+
+/**
+ * The budget period a date falls in, per the wallet's default period: the pay cycle containing
+ * it, the default range if it contains the date, or else the calendar month of the date.
+ */
+export function getBudgetPeriodForDate(
+	wallet: { default_period: string; saved_periods: { name: string; startDate: string; endDate: string }[]; cycle_start_day: number },
+	date: string,
+	now = new Date()
+): DateRange & { period: string } {
+	const target = parseLocalDate(date);
+	const ymd = toYmd(target);
+	const stored = wallet.default_period || 'this-month';
+
+	if (stored === 'pay-cycle') {
+		const cycleStartDay = wallet.cycle_start_day || 1;
+		const offset = getPayCycleOffsetForDate(target, cycleStartDay, now);
+		return { period: 'pay-cycle', ...getPayCycleRange(cycleStartDay, offset, now) };
+	}
+
+	const monthOfDate = {
+		period: 'month',
+		startDate: toYmd(new Date(target.getFullYear(), target.getMonth(), 1)),
+		endDate: toYmd(new Date(target.getFullYear(), target.getMonth() + 1, 0))
+	};
+	if (stored === 'this-month' || stored === 'last-month') return monthOfDate;
+
+	const saved = wallet.saved_periods.find((s) => s.name === stored);
+	const range = getStandardPeriodRange(stored, now) ?? (saved ? { startDate: saved.startDate, endDate: saved.endDate } : null);
+	return range && isDateInRange(range, ymd) ? { period: stored, ...range } : monthOfDate;
 }
 
 export function getStandardPeriodRange(period: string, now = new Date()): DateRange | null {

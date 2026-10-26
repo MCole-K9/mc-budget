@@ -6,6 +6,8 @@ const ownerCreate = "@request.auth.id != '' && @request.body.user = @request.aut
 const keepsOwner = '(@request.body.user:isset = false || @request.body.user = @request.auth.id)';
 const keepsWallet =
 	'(@request.body.wallet:isset = false || @request.body.wallet.user = @request.auth.id)';
+const keepsSourceWallet =
+	'(@request.body.source_wallet:isset = false || @request.body.source_wallet.user = @request.auth.id)';
 
 const tenantCollectionRules = {
 	presets: {
@@ -41,6 +43,14 @@ const tenantCollectionRules = {
 		viewRule: '@request.auth.id = wallet.user.id',
 		createRule: '@request.auth.id = wallet.user.id',
 		updateRule: `@request.auth.id = wallet.user.id && ${keepsWallet}`,
+		deleteRule: '@request.auth.id = wallet.user.id'
+	},
+	// Keep in sync with pb_migrations/12_budget_covers.js
+	budget_covers: {
+		listRule: '@request.auth.id = wallet.user.id',
+		viewRule: '@request.auth.id = wallet.user.id',
+		createRule: '@request.auth.id = wallet.user.id && @request.auth.id = source_wallet.user.id',
+		updateRule: `@request.auth.id = wallet.user.id && ${keepsWallet} && ${keepsSourceWallet}`,
 		deleteRule: '@request.auth.id = wallet.user.id'
 	}
 };
