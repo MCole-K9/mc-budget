@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.7.0](https://github.com/MCole-K9/mc-budget/compare/v1.6.0...v1.7.0) (2026-10-26)
+
+
+### Features
+
+* implement recurring transaction creation and migration for historical copies ([00478bd](https://github.com/MCole-K9/mc-budget/commit/00478bd94725a38ca6e4de9a45978ad51f61a198))
+* implement wallet summary computation and integrate into transaction summary ([b6b6691](https://github.com/MCole-K9/mc-budget/commit/b6b66913831a4459dc27b2c02ef24c015f0497f0))
+* redesign the user interface ([#17](https://github.com/MCole-K9/mc-budget/issues/17)) ([ce85d07](https://github.com/MCole-K9/mc-budget/commit/ce85d07f1095df16529cb1373fb48f7e0f8536c2))
+
+
+### Bug Fixes
+
+* correct summaries, pay cycles, access rules and transfer rollback ([842a043](https://github.com/MCole-K9/mc-budget/commit/842a043118b06c9846d7ac4eeba674b5a18da924))
+
 ## [1.6.0](https://github.com/MCole-K9/mc-budget/compare/v1.5.0...v1.6.0) (2026-07-16)
 
 
