@@ -12,7 +12,7 @@
 	let { presets, selected, budgetType = 'percentage', onselect }: Props = $props();
 </script>
 
-<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
 	{#each presets as preset (preset.id)}
 		{@const isSelected = selected === preset.id}
 		<button
