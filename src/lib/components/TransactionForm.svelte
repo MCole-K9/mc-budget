@@ -145,7 +145,7 @@
 		/>
 	{/if}
 
-	<div class="grid gap-4 sm:grid-cols-[1fr_auto]">
+	<div class="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
 		<Input
 			{...createTransaction.fields.description.as('text')}
 			label="Description (optional)"

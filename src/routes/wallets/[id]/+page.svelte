@@ -772,7 +772,7 @@
 				{/each}
 			</div>
 
-			<div class="grid gap-x-8 gap-y-5 md:grid-cols-2">
+			<div class="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
 				{#each wallet.categories as category, i (category.name)}
 					{@const budget = categoryBudgets[i]}
 					{@const allocated = budget.allocated}
