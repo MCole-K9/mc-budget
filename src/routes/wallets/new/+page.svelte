@@ -170,7 +170,7 @@
 		{#if step === 'preset'}
 			<div class="space-y-6">
 				<!-- Budget type selection -->
-				<div class="grid gap-3 sm:grid-cols-2">
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
 					{#each BUDGET_TYPES as t (t.value)}
 						<button
 							type="button"
@@ -257,7 +257,7 @@
 						required
 					/>
 
-					<div class="grid gap-4 sm:grid-cols-2">
+					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 						<Input
 							type="number"
 							label="Starting balance"
@@ -284,7 +284,7 @@
 								{/each}
 							</div>
 						{/if}
-						<div class="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+						<div class="grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
 							{#each categories as category (category.name)}
 								<div class="flex items-center justify-between gap-2 text-sm">
 									<span class="flex min-w-0 items-center gap-2">

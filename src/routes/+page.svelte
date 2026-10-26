@@ -177,7 +177,7 @@
 			{/each}
 		</section>
 
-		<div class="grid gap-10 xl:grid-cols-5">
+		<div class="grid grid-cols-1 gap-10 xl:grid-cols-5">
 			<!-- Wallets -->
 			<section class="xl:col-span-3">
 				<div class="mb-3 flex items-center justify-between">
@@ -189,7 +189,7 @@
 						View all <Icon name="arrow-right" class="size-3.5" />
 					</a>
 				</div>
-				<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
 					{#each wallets.slice(0, 4) as wallet (wallet.id)}
 						<WalletCard {wallet} />
 					{/each}
@@ -292,7 +292,7 @@
 		</div>
 	</section>
 
-	<section class="grid gap-4 pb-12 sm:grid-cols-2 lg:grid-cols-4">
+	<section class="grid grid-cols-1 gap-4 pb-12 sm:grid-cols-2 lg:grid-cols-4">
 		{#each features as feature (feature.title)}
 			<div class="surface p-5">
 				<span class="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary">

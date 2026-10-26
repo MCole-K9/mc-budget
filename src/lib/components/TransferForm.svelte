@@ -50,7 +50,7 @@
 			description="Create another wallet to move money between them."
 		/>
 	{:else}
-		<div class="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+		<div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-2">
 			<div class="flex min-w-0 flex-col gap-1.5">
 				<span class="text-sm font-medium text-base-content/80">From</span>
 				<div class="input w-full bg-base-200/60">

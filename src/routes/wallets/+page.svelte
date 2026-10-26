@@ -35,7 +35,7 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
-		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 			{#each wallets as wallet (wallet.id)}
 				<WalletCard {wallet} />
 			{/each}
@@ -70,7 +70,7 @@
 				{#if archived.length === 0}
 					<p class="mt-3 pl-6 text-sm text-base-content/45">No archived wallets.</p>
 				{:else}
-					<div class="mt-4 grid gap-4 opacity-70 sm:grid-cols-2 lg:grid-cols-3">
+					<div class="mt-4 grid grid-cols-1 gap-4 opacity-70 sm:grid-cols-2 lg:grid-cols-3">
 						{#each archived as wallet (wallet.id)}
 							<WalletCard {wallet} />
 						{/each}

@@ -285,7 +285,7 @@
 
 		<!-- Charts row: Donut + Budget vs Actual -->
 		{#if hasSpending}
-			<div class={['grid gap-4', budgetVsActualConfig ? 'lg:grid-cols-2' : 'grid-cols-1']}>
+			<div class={['grid grid-cols-1 gap-4', budgetVsActualConfig && 'lg:grid-cols-2']}>
 				<Card title="Spending by category" subtitle={primaryCurrency}>
 					<div class="mx-auto flex max-w-sm items-center justify-center">
 						<ChartCanvas config={donutConfig} class="max-h-72" />

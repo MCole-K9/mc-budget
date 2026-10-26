@@ -298,7 +298,7 @@
 				'Your own keys override the shared system keys. They are stored per user on the server and never sent to the browser.'
 			)}
 
-			<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
 				{#each AI_PROVIDERS as provider (provider)}
 					{@const isSet = userConfigured[provider]}
 					{@const isSaving = userSaving === provider}
@@ -496,7 +496,7 @@
 					'Shared system keys used for receipt scanning. Keys are stored on the server and never sent to the browser.'
 				)}
 
-				<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
 					{#each AI_PROVIDERS as provider (provider)}
 						{@const isActive = activeProvider === provider}
 						{@const isConfigured = configured[provider]}

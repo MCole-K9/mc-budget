@@ -84,7 +84,7 @@
 	</Alert>
 {/if}
 
-<div class="grid gap-4 md:grid-cols-2">
+<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
 	{#each presets as preset (preset.id)}
 		{@const isOwn = !!preset.user && preset.user === auth.user?.id}
 		<div class="surface flex h-full flex-col p-5">
