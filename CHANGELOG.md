@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.1](https://github.com/MCole-K9/mc-budget/compare/v1.7.0...v1.7.1) (2026-10-26)
+
+
+### Bug Fixes
+
+* keep the home overview tidy on narrow phones ([#18](https://github.com/MCole-K9/mc-budget/issues/18)) ([3bea144](https://github.com/MCole-K9/mc-budget/commit/3bea144e09591fb234b0dbf5da36b4f674bfc695))
+* stop long text from widening the page on phones ([#20](https://github.com/MCole-K9/mc-budget/issues/20)) ([bbe349d](https://github.com/MCole-K9/mc-budget/commit/bbe349db91187aa0cda671c4cdeac4ebac8a1d0b))
+
 ## [1.7.0](https://github.com/MCole-K9/mc-budget/compare/v1.6.0...v1.7.0) (2026-10-26)
 
 
