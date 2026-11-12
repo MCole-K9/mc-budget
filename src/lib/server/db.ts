@@ -28,7 +28,9 @@ export async function getAdminPb(): Promise<PocketBase> {
 		if (!_adminAuthPromise) {
 			_adminAuthPromise = (async () => {
 				_adminPb!.authStore.clear();
-				await _adminPb!.collection('_superusers').authWithPassword(privateEnv.PB_ADMIN_EMAIL, privateEnv.PB_ADMIN_PASSWORD);
+				await _adminPb!
+					.collection('_superusers')
+					.authWithPassword(privateEnv.PB_ADMIN_EMAIL ?? '', privateEnv.PB_ADMIN_PASSWORD ?? '');
 				_adminAuthExpiry = Date.now() + 11 * 60 * 60 * 1000; // re-auth after 11h (tokens last 12h)
 			})().finally(() => {
 				_adminAuthPromise = null;

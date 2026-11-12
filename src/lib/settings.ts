@@ -58,8 +58,19 @@ export const PROVIDER_LABELS: Record<AiProvider, string> = {
 	google: 'Google Gemini'
 };
 
-export const PROVIDER_MODELS: Record<AiProvider, string> = {
-	anthropic: 'claude-haiku-4-5-20251001',
-	openai: 'gpt-4o-mini',
-	google: 'gemini-1.5-flash'
-};
+// Cheap current models with image input + structured output (checked 2026-11-12 against
+// the TanStack AI adapter model metadata and the provider docs):
+// https://platform.claude.com/docs/en/models/overview
+// https://developers.openai.com/api/docs/models/all
+// https://ai.google.dev/gemini-api/docs/models
+// `as const` keeps the literal ids: the TanStack AI adapters accept only known model ids.
+export const PROVIDER_MODELS = {
+	anthropic: 'claude-haiku-5-5',
+	openai: 'gpt-6-luna',
+	google: 'gemini-3.5-flash-lite'
+} as const satisfies Record<AiProvider, string>;
+
+/** Settings row name (instance `app_settings` and per-user `user_settings`) for a provider's API key. */
+export function aiKeySetting(provider: AiProvider): string {
+	return `${provider}_api_key`;
+}
