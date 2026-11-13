@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.0](https://github.com/MCole-K9/mc-budget/compare/v1.7.1...v1.8.0) (2026-11-13)
+
+
+### Features
+
+* encrypt AI keys at rest and share the AI model resolver ([#21](https://github.com/MCole-K9/mc-budget/issues/21)) ([41ac54b](https://github.com/MCole-K9/mc-budget/commit/41ac54b1c85b510d6edaa32a4b786b77974e758f))
+
+
+### Bug Fixes
+
+* check admin env vars before PocketBase admin login ([#23](https://github.com/MCole-K9/mc-budget/issues/23)) ([a12acb8](https://github.com/MCole-K9/mc-budget/commit/a12acb8755d6bd1082e2f4d5ba295e23902ad1e2))
+
 ## [1.7.1](https://github.com/MCole-K9/mc-budget/compare/v1.7.0...v1.7.1) (2026-10-26)
 
 
