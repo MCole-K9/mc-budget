@@ -12,6 +12,10 @@ _Avoid_: Notification, bank email, message
 The way an Alert reached the app: auto-forward, manual forward, paste or share.
 _Avoid_: Source, method
 
+**Forward address**:
+A user's private email address at the app's inbound domain. Mail sent to it arrives as Alerts for that user.
+_Avoid_: Inbox address, alias, mailbox
+
 **Pending alert**:
 An Alert that was parsed into a proposed transaction and waits for the user to confirm or discard it. Every Alert starts as Pending.
 _Avoid_: Draft, unconfirmed transaction

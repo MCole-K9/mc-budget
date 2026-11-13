@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import type { ParsedAlert, ParserTemplate } from '$lib/alerts/engine';
+import type PocketBase from 'pocketbase';
+import type { AlertInput, ParsedAlert, ParserTemplate } from '$lib/alerts/engine';
 
 type TemplateRecord = {
 	id: string;
@@ -86,3 +87,65 @@ export async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T>
 		if (locks.get(key) === tail) locks.delete(key);
 	}
 }
+
+/** The user's enabled templates, oldest first, at most `max` (bounds the work per parse). */
+export async function loadUserTemplates(
+	pb: PocketBase,
+	userId: string,
+	max: number
+): Promise<ParserTemplate[]> {
+	// Explicit user filter: the inbound endpoint uses the admin client, which owner rules don't limit
+	const records = await pb.collection('parser_templates').getList(1, max, {
+		filter: pb.filter('user = {:user} && enabled = true', { user: userId }),
+		sort: 'created',
+		requestKey: null
+	});
+	return records.items.map((r) => toTemplate(r as unknown as TemplateRecord));
+}
+
+export async function findDuplicateAlert(
+	pb: PocketBase,
+	userId: string,
+	hash: string
+): Promise<string | null> {
+	const found = await pb.collection('alerts').getList(1, 1, {
+		filter: pb.filter('user = {:user} && dedupe_hash = {:hash}', { user: userId, hash }),
+		fields: 'id',
+		requestKey: null
+	});
+	return found.items[0]?.id ?? null;
+}
+
+/**
+ * Stores one received alert. Read by a template (or AI) → Pending, raw text dropped.
+ * Not readable → "failed" (Unread), raw text kept so the user can write a template for it.
+ * The same alert twice → nothing stored ("duplicate").
+ */
+export async function saveAlert(
+	pb: PocketBase,
+	userId: string,
+	input: AlertInput,
+	parsed: ParsedAlert | null
+): Promise<{ status: 'pending' | 'failed' | 'duplicate'; id: string }> {
+	const base = { user: userId, channel: input.channel, received_at: input.receivedAt };
+	if (!parsed) {
+		const record = await pb
+			.collection('alerts')
+			.create({ ...base, status: 'failed', raw_text: input.text });
+		return { status: 'failed', id: record.id };
+	}
+	const hash = dedupeHash(userId, parsed);
+	const duplicate = await findDuplicateAlert(pb, userId, hash);
+	if (duplicate) return { status: 'duplicate', id: duplicate };
+	const record = await pb.collection('alerts').create({
+		...base,
+		status: 'pending',
+		raw_text: '',
+		dedupe_hash: hash,
+		...parsedFields(parsed)
+	});
+	return { status: 'pending', id: record.id };
+}
+
+/** Most templates a user may have; every parse runs each enabled one. */
+export const MAX_TEMPLATES = 20;

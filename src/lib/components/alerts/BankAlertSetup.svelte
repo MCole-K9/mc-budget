@@ -3,6 +3,7 @@
 	import { PROVIDERS, providerForEmail, type MailProvider } from '$lib/alerts/engine';
 	import { getAlertAiStatus, setAlertAiFallback } from '$lib/alerts.remote';
 	import Button from '../Button.svelte';
+	import ForwardAddress from './ForwardAddress.svelte';
 
 	interface Props {
 		/** The signed-in user's email, used to pick their mail provider */
@@ -85,14 +86,13 @@
 		{/if}
 	</div>
 
+	<ForwardAddress />
+
 	<ol class="list-inside list-decimal space-y-1 text-sm text-base-content/70">
-		<li>Copy a bank alert from your email or SMS, or forward it to yourself.</li>
-		<li>Paste it on the Bank alerts page. A template reads the amount, merchant and card.</li>
+		<li>Forward bank alerts to your address, or paste them on the Bank alerts page.</li>
+		<li>A template reads the amount, merchant and card.</li>
 		<li>Review the Pending transaction and confirm it into a wallet.</li>
 	</ol>
-	<p class="text-xs text-base-content/50">
-		A personal forwarding address, so alerts arrive by themselves, is not available yet.
-	</p>
 
 	<div class="rounded-box border border-base-300/70 p-4">
 		<label class="flex cursor-pointer items-start justify-between gap-3">

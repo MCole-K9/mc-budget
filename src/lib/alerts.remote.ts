@@ -3,8 +3,19 @@ import { error } from '@sveltejs/kit';
 import { query, command } from '$app/server';
 import type PocketBase from 'pocketbase';
 import type { RecordModel } from 'pocketbase';
+import { env as privateEnv } from '$env/dynamic/private';
 import { getPb } from '$lib/server/db';
-import { dedupeHash, parsedFields, toTemplate, withLock } from '$lib/server/alerts';
+import { newInboxToken } from '$lib/server/inboundEmail';
+import {
+	dedupeHash,
+	findDuplicateAlert,
+	loadUserTemplates,
+	MAX_TEMPLATES,
+	parsedFields,
+	saveAlert,
+	toTemplate,
+	withLock
+} from '$lib/server/alerts';
 import {
 	draftTemplateWithAi,
 	readAlertWithAi,
@@ -32,7 +43,7 @@ import { getTransactions } from '$lib/transactions.remote';
 // Parse budget: every parse runs each enabled template (up to 8 RE2 regexes) over the text, synchronously.
 // Bank alerts are short, so 20,000 chars x 20 templates x 10 parses/min keeps one user from stalling the server.
 const MAX_PASTE_CHARS = 20_000;
-const MAX_TEMPLATES = 20;
+
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_PARSES = 10;
 const parseRateState = new Map<string, number[]>();
@@ -128,14 +139,9 @@ function enforceParseRateLimit(userId: string): void {
 
 const isoDate = (value: unknown) => String(value ?? '').replace(' ', 'T');
 
-/** Enabled templates, oldest first. Never more than MAX_TEMPLATES, which bounds the work per parse. */
-async function loadTemplates(pb: PocketBase): Promise<ParserTemplate[]> {
-	const records = await pb.collection('parser_templates').getList(1, MAX_TEMPLATES, {
-		filter: 'enabled = true',
-		sort: 'created',
-		requestKey: null
-	});
-	return records.items.map((r) => toTemplate(r as unknown as Parameters<typeof toTemplate>[0]));
+/** The signed-in user's enabled templates (at most MAX_TEMPLATES, which bounds the work per parse). */
+function loadTemplates(pb: PocketBase): Promise<ParserTemplate[]> {
+	return loadUserTemplates(pb, requireUserId(), MAX_TEMPLATES);
 }
 
 function pasteInput(text: string): AlertInput {
@@ -168,15 +174,6 @@ function toAlertView(r: RecordModel, links: Map<string, string>): AlertView {
 	};
 }
 
-async function findDuplicate(pb: PocketBase, hash: string): Promise<string | null> {
-	const found = await pb.collection('alerts').getList(1, 1, {
-		filter: pb.filter('dedupe_hash = {:hash}', { hash }),
-		fields: 'id',
-		requestKey: null
-	});
-	return found.items[0]?.id ?? null;
-}
-
 // ---- Alerts -------------------------------------------------------------------------------
 
 const AlertTextSchema = z.object({
@@ -206,29 +203,9 @@ export const submitAlert = command(AlertTextSchema, async ({ text }) => {
 	const input = pasteInput(text);
 	const templates = await loadTemplates(pb);
 	const parsed = await readAlert(userId, input, templates);
-
-	const base = { user: userId, channel: input.channel, received_at: input.receivedAt };
-	if (!parsed) {
-		const record = await pb
-			.collection('alerts')
-			.create({ ...base, status: 'failed', raw_text: text });
-		refreshAlertLists();
-		return { status: 'failed' as const, id: record.id };
-	}
-
-	const hash = dedupeHash(userId, parsed);
-	const duplicate = await findDuplicate(pb, hash);
-	if (duplicate) return { status: 'duplicate' as const, id: duplicate };
-
-	const record = await pb.collection('alerts').create({
-		...base,
-		status: 'pending',
-		raw_text: '',
-		dedupe_hash: hash,
-		...parsedFields(parsed)
-	});
-	refreshAlertLists();
-	return { status: 'pending' as const, id: record.id };
+	const saved = await saveAlert(pb, userId, input, parsed);
+	if (saved.status !== 'duplicate') refreshAlertLists();
+	return saved;
 });
 
 const AlertListSchema = z.enum(['pending', 'failed', 'done']);
@@ -405,7 +382,7 @@ export const reparseAlert = command(z.string().min(1), async (id) => {
 		if (!parsed) return 'failed' as const;
 
 		const hash = dedupeHash(userId, parsed);
-		if (await findDuplicate(pb, hash)) {
+		if (await findDuplicateAlert(pb, userId, hash)) {
 			await pb.collection('alerts').update(id, { status: 'ignored', raw_text: '' });
 			return 'duplicate' as const;
 		}
@@ -614,3 +591,65 @@ export const draftTemplateAi = command(
 		}
 	}
 );
+
+// ---- Forward address (email in) -----------------------------------------------------------
+
+export type AlertInboxView = {
+	/** False when this server has no INBOUND_EMAIL_DOMAIN / INBOUND_EMAIL_SECRET */
+	available: boolean;
+	address: string | null;
+	enabled: boolean;
+	confirmLink: string;
+	confirmText: string;
+	confirmAt: string;
+};
+
+async function findInbox(pb: PocketBase, userId: string) {
+	const found = await pb.collection('alert_inboxes').getList(1, 1, {
+		filter: pb.filter('user = {:user}', { user: userId }),
+		requestKey: null
+	});
+	return found.items[0] ?? null;
+}
+
+const inboundDomain = () =>
+	privateEnv.INBOUND_EMAIL_SECRET ? (privateEnv.INBOUND_EMAIL_DOMAIN ?? '').toLowerCase() : '';
+
+export const getAlertInbox = query(async (): Promise<AlertInboxView> => {
+	const userId = requireUserId();
+	const domain = inboundDomain();
+	const inbox = domain ? await findInbox(getPb(), userId) : null;
+	return {
+		available: !!domain,
+		address: inbox ? `${inbox.token}@${domain}` : null,
+		enabled: inbox?.enabled === true,
+		confirmLink: inbox?.confirm_link ?? '',
+		confirmText: inbox?.confirm_text ?? '',
+		confirmAt: inbox?.confirm_at ? isoDate(inbox.confirm_at) : ''
+	};
+});
+
+/** Creates the user's forward address, or replaces it with a new one (the old one stops working). */
+export const newAlertInboxAddress = command(async () => {
+	const userId = requireUserId();
+	if (!inboundDomain()) error(400, 'Email forwarding is not set up on this server');
+	const pb = getPb();
+	await withLock(`inbox:${userId}`, async () => {
+		const inbox = await findInbox(pb, userId);
+		const fresh = { token: newInboxToken(), enabled: true, confirm_text: '', confirm_link: '' };
+		if (inbox) await pb.collection('alert_inboxes').update(inbox.id, fresh);
+		else await pb.collection('alert_inboxes').create({ user: userId, ...fresh });
+	});
+	getAlertInbox().refresh();
+	return { success: true };
+});
+
+export const setAlertInboxEnabled = command(z.boolean(), async (enabled) => {
+	const userId = requireUserId();
+	const pb = getPb();
+	const inbox = await findInbox(pb, userId);
+	if (!inbox) error(404, 'Create a forward address first');
+	await pb.collection('alert_inboxes').update(inbox.id, { enabled });
+	getAlertInbox().refresh();
+	return { enabled };
+});

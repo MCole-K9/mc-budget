@@ -1,0 +1,11 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "mc-budget-inbound-email",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-11-12",
+	"vars": {
+		// Public URL of your MC Budget app (not localhost: the Worker runs on Cloudflare)
+		"APP_URL": "https://your-mc-budget-app.example.com"
+	}
+	// Secret (not here): npx wrangler secret put INBOUND_EMAIL_SECRET
+}

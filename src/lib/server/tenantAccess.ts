@@ -68,6 +68,14 @@ const tenantCollectionRules = {
 		updateRule: `@request.auth.id = user.id && ${keepsOwner}`,
 		deleteRule: '@request.auth.id = user.id'
 	},
+	// Keep in sync with pb_migrations/14_alert_inboxes.js
+	alert_inboxes: {
+		listRule: '@request.auth.id = user.id',
+		viewRule: '@request.auth.id = user.id',
+		createRule: ownerCreate,
+		updateRule: `@request.auth.id = user.id && ${keepsOwner}`,
+		deleteRule: '@request.auth.id = user.id'
+	},
 	account_links: {
 		listRule: '@request.auth.id = user.id',
 		viewRule: '@request.auth.id = user.id',
