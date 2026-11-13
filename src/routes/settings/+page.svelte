@@ -23,6 +23,8 @@
 	import Alert from '$lib/components/Alert.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import Icon, { type IconName } from '$lib/components/Icon.svelte';
+	import BankAlertSetup from '$lib/components/alerts/BankAlertSetup.svelte';
+	import { auth } from '$lib/stores/auth.svelte';
 
 	const initial = await getAiSettings();
 	const [{ baseCurrency: initBase }, userAi, initialPendingAccounts, initialApprovedAccounts] =
@@ -299,6 +301,16 @@
 			</div>
 		</section>
 
+		<!-- Bank alerts -->
+		<section id="bank-alerts" class="surface p-5 sm:p-6">
+			{@render sectionHeading(
+				'inbox',
+				'Bank alerts',
+				'Turn the email or SMS alerts your bank sends into transactions. Nothing reaches a wallet until you confirm it.'
+			)}
+			<BankAlertSetup email={auth.user?.email ?? ''} />
+		</section>
+
 		<!-- Personal keys -->
 		<section class="surface p-5 sm:p-6">
 			{@render sectionHeading(
@@ -323,7 +335,9 @@
 						<div class="flex items-start justify-between gap-2">
 							<p class="font-semibold">{PROVIDER_LABELS[provider]}</p>
 							{#if isSet}
-								<span class="badge badge-soft badge-sm whitespace-nowrap badge-success">Key set</span>
+								<span class="badge badge-soft badge-sm whitespace-nowrap badge-success"
+									>Key set</span
+								>
 							{:else}
 								<span class="badge badge-ghost badge-sm whitespace-nowrap">Using system</span>
 							{/if}
@@ -536,7 +550,9 @@
 										<span class="badge badge-sm badge-primary">Active</span>
 									{/if}
 									{#if isConfigured}
-										<span class="badge badge-soft badge-sm whitespace-nowrap badge-success">Key set</span>
+										<span class="badge badge-soft badge-sm whitespace-nowrap badge-success"
+											>Key set</span
+										>
 									{:else}
 										<span class="badge badge-ghost badge-sm">No key</span>
 									{/if}
@@ -601,11 +617,7 @@
 		kept and the account can be approved again later.
 	</p>
 	{#snippet actions()}
-		<Button
-			variant="ghost"
-			disabled={!!revokingAccountId}
-			onclick={() => (accountToRevoke = null)}
-		>
+		<Button variant="ghost" disabled={!!revokingAccountId} onclick={() => (accountToRevoke = null)}>
 			Cancel
 		</Button>
 		<Button variant="error" loading={!!revokingAccountId} onclick={handleRevokeAccount}>

@@ -1,0 +1,15 @@
+{
+	"name": "mc-budget-inbound-email",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "wrangler dev",
+		"deploy": "wrangler deploy"
+	},
+	"dependencies": {
+		"postal-mime": "^4.2.1"
+	},
+	"devDependencies": {
+		"wrangler": "^4.161.0"
+	}
+}

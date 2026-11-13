@@ -68,6 +68,8 @@ openssl rand -base64 32
 
 Without `SECRETS_KEY`, saving an AI key fails. Keys saved before this setting existed stay readable and are encrypted the next time they are read. If you lose or change `SECRETS_KEY`, enter the saved keys again.
 
+Optional: to let users forward bank alerts by email, set `INBOUND_EMAIL_DOMAIN` and `INBOUND_EMAIL_SECRET` and deploy the Cloudflare Email Worker. See [workers/inbound-email/README.md](workers/inbound-email/README.md).
+
 ### 3. Set Up PocketBase
 
 1. Copy the migrations folder to your PocketBase directory:

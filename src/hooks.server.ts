@@ -14,8 +14,11 @@ function isProtectedRoute(pathname: string) {
 	const reportsPath = resolve('/reports');
 	const recurringPath = resolve('/recurring');
 	const settingsPath = resolve('/settings');
+	const alertsPath = resolve('/alerts');
 
 	return (
+		pathname === alertsPath ||
+		pathname.startsWith(`${alertsPath}/`) ||
 		pathname === walletsPath ||
 		pathname.startsWith(`${walletsPath}/`) ||
 		pathname === presetsPath ||
