@@ -106,6 +106,15 @@
 	let userErrors = $state<Record<AiProvider, string>>({ anthropic: '', openai: '', google: '' });
 	let userSaved = $state<AiProvider | null>(null);
 
+	// Same order as getModelForUser on the server: own key, then instance key.
+	const keyInUse = $derived(
+		userConfigured[activeProvider]
+			? { label: 'Your key', badge: 'badge-success' }
+			: configured[activeProvider]
+				? { label: 'Instance key', badge: 'badge-info' }
+				: { label: 'Off', badge: 'badge-ghost' }
+	);
+
 	let pendingAccounts = $state<ManagedAccount[]>(initialPendingAccounts);
 	let approvedAccounts = $state<ManagedAccount[]>(initialApprovedAccounts);
 	let approvingAccountId = $state<string | null>(null);
@@ -295,8 +304,14 @@
 			{@render sectionHeading(
 				'key',
 				'Personal API keys',
-				'Your own keys override the shared system keys. They are stored per user on the server and never sent to the browser.'
+				'Your own keys override the shared system keys. They are encrypted on the server and never sent to the browser.'
 			)}
+
+			<p class="mb-4 flex flex-wrap items-center gap-2 text-sm">
+				<span class="text-base-content/60">Receipt scanning uses</span>
+				<span class="badge badge-soft badge-sm {keyInUse.badge}">{keyInUse.label}</span>
+				<span class="text-base-content/60">({PROVIDER_LABELS[activeProvider]})</span>
+			</p>
 
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
 				{#each AI_PROVIDERS as provider (provider)}
@@ -493,7 +508,7 @@
 				{@render sectionHeading(
 					'sparkles',
 					'AI provider',
-					'Shared system keys used for receipt scanning. Keys are stored on the server and never sent to the browser.'
+					'Shared system keys used for receipt scanning. Keys are encrypted on the server and never sent to the browser.'
 				)}
 
 				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">

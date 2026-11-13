@@ -11,13 +11,26 @@ import {
 	setAiProvider,
 	setPrivateInstance
 } from '$lib/server/settings';
-import { getUserSetting, setUserSetting, deleteUserSetting } from '$lib/server/userSettings';
+import {
+	getUserSetting,
+	setUserSetting,
+	deleteUserAiKey,
+	getUserAiKey,
+	setUserAiKey
+} from '$lib/server/userSettings';
 import { fetchRates } from '$lib/server/exchangeRates';
+import { hasSecretsKey } from '$lib/server/secrets';
 
 function requireAuth() {
 	const user = getPb().authStore.record;
 	if (!user) error(401, 'Not authenticated');
 	return user;
+}
+
+// encryptSecret throws a plain Error, which SvelteKit hides from the client as "Internal Error".
+function requireSecretsKey() {
+	if (!hasSecretsKey())
+		error(500, 'Server is missing a valid SECRETS_KEY. Ask the administrator to set it.');
 }
 
 function requireAdmin() {
@@ -128,6 +141,7 @@ export const saveProviderKey = command(
 	}),
 	async ({ provider, apiKey }) => {
 		requireAdmin();
+		requireSecretsKey();
 		await setAiKey(provider, apiKey);
 		return { success: true };
 	}
@@ -163,10 +177,11 @@ export const getExchangeRates = query(z.string(), async (baseCurrency) => {
 
 export const getUserAiSettings = query(async () => {
 	requireAuth();
+	// Decrypt (not just read) so a key that cannot be decrypted shows as not set.
 	const [anthropic, openai, google] = await Promise.all([
-		getUserSetting('anthropic_api_key'),
-		getUserSetting('openai_api_key'),
-		getUserSetting('google_api_key')
+		getUserAiKey('anthropic'),
+		getUserAiKey('openai'),
+		getUserAiKey('google')
 	]);
 	return { keys: { anthropic: !!anthropic, openai: !!openai, google: !!google } };
 });
@@ -178,7 +193,8 @@ export const saveUserProviderKey = command(
 	}),
 	async ({ provider, apiKey }) => {
 		requireAuth();
-		await setUserSetting(`${provider}_api_key`, apiKey.trim());
+		requireSecretsKey();
+		await setUserAiKey(provider, apiKey.trim());
 		return { success: true };
 	}
 );
@@ -187,7 +203,7 @@ export const clearUserProviderKey = command(
 	z.object({ provider: z.enum(AI_PROVIDERS) }),
 	async ({ provider }) => {
 		requireAuth();
-		await deleteUserSetting(`${provider}_api_key`);
+		await deleteUserAiKey(provider);
 		return { success: true };
 	}
 );
