@@ -60,6 +60,14 @@ Edit `.env` if your PocketBase instance runs on a different URL:
 PUBLIC_POCKETBASE_URL=http://127.0.0.1:8090
 ```
 
+Set `SECRETS_KEY` to encrypt the AI API keys that admins and users save in Settings. It must be 32 random bytes, base64-encoded:
+
+```bash
+openssl rand -base64 32
+```
+
+Without `SECRETS_KEY`, saving an AI key fails. Keys saved before this setting existed stay readable and are encrypted the next time they are read. If you lose or change `SECRETS_KEY`, enter the saved keys again.
+
 ### 3. Set Up PocketBase
 
 1. Copy the migrations folder to your PocketBase directory:

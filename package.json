@@ -44,10 +44,10 @@
 		"vitest": "^4.1.0"
 	},
 	"dependencies": {
-		"@ai-sdk/anthropic": "^3.0.58",
-		"@ai-sdk/google": "^3.0.43",
-		"@ai-sdk/openai": "^3.0.41",
-		"ai": "^6.0.116",
+		"@tanstack/ai": "^1.4.0",
+		"@tanstack/ai-anthropic": "^1.1.1",
+		"@tanstack/ai-gemini": "^1.2.2",
+		"@tanstack/ai-openai": "^1.1.1",
 		"chart.js": "^4.5.1",
 		"daisyui": "5",
 		"pocketbase": "^0.26.8",

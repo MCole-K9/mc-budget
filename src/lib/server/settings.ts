@@ -1,7 +1,8 @@
 import { withAdminPb } from './db';
 import { setTenantCollectionRules } from './tenantAccess';
 import { env as privateEnv } from '$env/dynamic/private';
-import { AI_PROVIDERS, type AiProvider } from '$lib/settings';
+import { AI_PROVIDERS, aiKeySetting, type AiProvider } from '$lib/settings';
+import { encryptSecret, readStoredSecret } from './secrets';
 
 // Allowlist: only lowercase letters, digits, and underscores.
 // Prevents filter injection if this module is ever called with dynamic input.
@@ -26,6 +27,28 @@ async function upsertSetting(key: string, value: string): Promise<void> {
 		} else {
 			await pb.collection('app_settings').create({ skey: key, value });
 		}
+	});
+}
+
+/**
+ * Replaces a setting only while it still holds `expected`. Never creates a row, so a lazy
+ * upgrade cannot overwrite a key saved after it was read.
+ */
+export async function replaceSettingIfUnchanged(
+	key: string,
+	expected: string,
+	value: string
+): Promise<void> {
+	assertSafeKey(key);
+	await withAdminPb(async (pb) => {
+		let record: { id: string; value?: unknown };
+		try {
+			record = await pb.collection('app_settings').getFirstListItem(`skey="${key}"`);
+		} catch {
+			return; // Removed since it was read
+		}
+		if (record.value !== expected) return; // Replaced since it was read
+		await pb.collection('app_settings').update(record.id, { value });
 	});
 }
 
@@ -85,7 +108,11 @@ export async function setAiProvider(provider: AiProvider): Promise<void> {
 }
 
 export async function getAiKey(provider: AiProvider): Promise<string> {
-	const key = await getSetting(`${provider}_api_key`);
+	const settingKey = aiKeySetting(provider);
+	const stored = await getSetting(settingKey);
+	const key = await readStoredSecret(stored, (encrypted) =>
+		replaceSettingIfUnchanged(settingKey, stored, encrypted)
+	);
 	if (key) return key;
 	// Fallback: env var for anthropic (backwards compat)
 	if (provider === 'anthropic') return privateEnv.ANTHROPIC_API_KEY ?? '';
@@ -93,5 +120,5 @@ export async function getAiKey(provider: AiProvider): Promise<string> {
 }
 
 export async function setAiKey(provider: AiProvider, value: string): Promise<void> {
-	await upsertSetting(`${provider}_api_key`, value);
+	await upsertSetting(aiKeySetting(provider), encryptSecret(value));
 }
