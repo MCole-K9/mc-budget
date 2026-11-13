@@ -60,11 +60,14 @@ export function applyTemplate(input: AlertInput, tpl: ParserTemplate): ParsedAle
 	if (!senderMatches(input, tpl)) return null;
 
 	const field = (key: keyof ParserTemplate['fields']) => capture(text, tpl.fields[key]);
+	// Required fields first, and stop at the first miss: a template for another bank costs one regex.
 	const amountRaw = field('amount');
 	const amount = normalizeAmount(amountRaw);
+	if (amount === null) return null;
 	const direction = normalizeDirection(field('direction'));
+	if (!direction) return null;
 	const currency = normalizeCurrency(field('currency')) ?? normalizeCurrency(amountRaw);
-	if (amount === null || !direction || !currency) return null;
+	if (!currency) return null;
 
 	return {
 		bankId: tpl.bankId,

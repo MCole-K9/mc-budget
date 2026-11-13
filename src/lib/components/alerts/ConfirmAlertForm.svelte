@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { confirmAlert, type AlertView } from '$lib/alerts.remote';
+	import { getExchangeRates } from '$lib/settings.remote';
+	import { formatCurrency } from '$lib/utils/format';
 	import type { ParsedAlert } from '$lib/alerts/engine';
 	import type { Wallet } from '$lib/types/budget';
 	import { toYmd } from '$lib/utils/dateRange';
@@ -30,7 +32,8 @@
 		)
 	);
 	let isExpense = $state(parsed.direction === 'debit');
-	let amount = $state<number | ''>(parsed.amount);
+	/** What the user typed; null = use the suggested amount (converted when currencies differ) */
+	let typedAmount = $state<number | '' | null>(null);
 	let description = $state(parsed.merchant ?? '');
 	let date = $state(toYmd(new Date(parsed.occurredAt)));
 	let incomeSource = $state('');
@@ -39,6 +42,15 @@
 	let errorMessage = $state('');
 
 	const wallet = $derived(wallets.find((w) => w.id === walletId));
+	// Units of the wallet currency per 1 unit of the alert currency; null = no rate available
+	const rate = $derived(
+		!wallet || wallet.currency === parsed.currency
+			? 1
+			: ((await getExchangeRates(parsed.currency)).rates[wallet.currency] ?? null)
+	);
+	const amount = $derived(
+		typedAmount ?? (rate ? Math.round(parsed.amount * rate * 100) / 100 : parsed.amount)
+	);
 	const walletOptions = $derived(
 		wallets.map((w) => ({ value: w.id, label: `${w.name} (${w.currency})` }))
 	);
@@ -82,12 +94,30 @@
 	{#if wallets.length === 0}
 		<Alert type="warning">Create a wallet first, then confirm this alert.</Alert>
 	{:else}
-		<Select label="Wallet" options={walletOptions} bind:value={walletId} />
+		<Select
+			label="Wallet"
+			options={walletOptions}
+			bind:value={
+				() => walletId,
+				(v) => {
+					walletId = v;
+					typedAmount = null; // a typed amount was in the old wallet's currency
+				}
+			}
+		/>
 		{#if wallet && wallet.currency !== parsed.currency}
-			<Alert type="warning">
-				The alert is in {parsed.currency}, but {wallet.name} uses {wallet.currency}. Enter the
-				amount in {wallet.currency}.
-			</Alert>
+			{#if rate}
+				<Alert type="info">
+					Converted from {formatCurrency(parsed.amount, parsed.currency)} at 1 {parsed.currency} =
+					{rate}
+					{wallet.currency}. Change the amount if your bank used another rate.
+				</Alert>
+			{:else}
+				<Alert type="warning">
+					The alert is in {parsed.currency}, but {wallet.name} uses {wallet.currency}, and no
+					exchange rate is available. Enter the amount in {wallet.currency}.
+				</Alert>
+			{/if}
 		{/if}
 
 		<ExpenseIncomeToggle bind:isExpense />
@@ -103,7 +133,14 @@
 		{/if}
 
 		<div class="grid grid-cols-2 gap-3">
-			<Input label="Amount" type="number" min="0.01" step="0.01" required bind:value={amount} />
+			<Input
+				label="Amount"
+				type="number"
+				min="0.01"
+				step="0.01"
+				required
+				bind:value={() => amount, (v) => (typedAmount = v ?? '')}
+			/>
 			<Input label="Date" type="date" required bind:value={date} />
 		</div>
 		<Input label="Description" maxlength={500} bind:value={description} />

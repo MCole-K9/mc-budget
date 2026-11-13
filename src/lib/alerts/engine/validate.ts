@@ -25,8 +25,18 @@ export function compileTemplateRegex(source: string): RE2JS {
 	if (source.length > MAX_REGEX_CHARS) {
 		throw new Error(`longer than ${MAX_REGEX_CHARS} characters`);
 	}
-	return RE2JS.compile(source, FLAGS);
+	let re = compiled.get(source);
+	if (!re) {
+		re = RE2JS.compile(source, FLAGS);
+		if (compiled.size >= MAX_CACHED) compiled.clear();
+		compiled.set(source, re);
+	}
+	return re;
 }
+
+// Each parse checks then runs every template regex, so cache compiled patterns (bounded).
+const MAX_CACHED = 1_000;
+const compiled = new Map<string, RE2JS>();
 
 /** Why a template regex cannot be used, or null when it compiles. */
 export function regexProblem(source: string): string | null {

@@ -100,3 +100,12 @@ describe('toParsedAlert', () => {
 		expect(toParsedAlert({ ...read, ...change }, received)).toBeNull();
 	});
 });
+
+describe('checkDraft merchant', () => {
+	it('flags a merchant that differs from what the alert says, ignoring case and spaces', () => {
+		const ok = { ...expected, merchant: 'sunny mart  kingston' };
+		expect(checkDraft(alert, SAMPLE_TEMPLATE, ok)).toEqual([]);
+		const wrong = { ...expected, merchant: 'Other Shop' };
+		expect(checkDraft(alert, SAMPLE_TEMPLATE, wrong)[0]).toMatch(/^merchant:/);
+	});
+});

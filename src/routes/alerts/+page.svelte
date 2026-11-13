@@ -3,6 +3,7 @@
 	import {
 		getAlerts,
 		getAlertAiStatus,
+		getPendingAlertCount,
 		ignoreAlert,
 		previewAlert,
 		reparseAlert,
@@ -24,15 +25,26 @@
 	type Tab = 'pending' | 'failed' | 'done';
 	let tab = $state<Tab>('pending');
 
-	const [wallets, pending, failed, aiStatus] = $derived(
-		await Promise.all([getWallets(), getAlerts('pending'), getAlerts('failed'), getAlertAiStatus()])
+	const [wallets, pending, failed, aiStatus, pendingCount] = $derived(
+		await Promise.all([
+			getWallets(),
+			getAlerts('pending'),
+			getAlerts('failed'),
+			getAlertAiStatus(),
+			getPendingAlertCount()
+		])
 	);
 	const done = $derived(tab === 'done' ? await getAlerts('done') : []);
 	const list = $derived(tab === 'pending' ? pending : tab === 'failed' ? failed : done);
+	/** getAlerts returns the latest 50 of each list */
+	const LIST_LIMIT = 50;
 
 	const tabs = $derived([
-		{ value: 'pending', label: `Pending (${pending.length})` },
-		{ value: 'failed', label: `Unread (${failed.length})` },
+		{ value: 'pending', label: `Pending (${pendingCount})` },
+		{
+			value: 'failed',
+			label: `Unread (${failed.length}${failed.length >= LIST_LIMIT ? '+' : ''})`
+		},
 		{ value: 'done', label: 'History' }
 	]);
 
@@ -135,7 +147,7 @@
 				id="alert-text"
 				class="textarea block min-h-36 w-full font-mono text-sm"
 				placeholder="Paste the text of a bank email or SMS (a forwarded email is fine)"
-				maxlength={100000}
+				maxlength={20000}
 				bind:value={text}
 				oninput={() => (preview = null)}
 			></textarea>
@@ -199,6 +211,11 @@
 				}[tab]}
 			/>
 		{:else}
+			{#if list.length >= LIST_LIMIT}
+				<p class="text-xs text-base-content/55">
+					Showing the latest {LIST_LIMIT}. Older ones show here as you handle these.
+				</p>
+			{/if}
 			<ul class="space-y-3">
 				{#each list as alert (alert.id)}
 					<li class="space-y-3 surface p-4">

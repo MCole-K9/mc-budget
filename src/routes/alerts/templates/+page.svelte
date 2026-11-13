@@ -65,24 +65,28 @@
 	let test = $state<Awaited<ReturnType<typeof testTemplate>> | null>(null);
 	let drafting = $state(false);
 	let aiNote = $state<{ ok: boolean; text: string } | null>(null);
+	/** Bumped when the user opens another template, so a late AI answer for the old one is dropped */
+	let draftSession = 0;
 
 	/** Fills the form with an AI draft for the sample. The user reviews, tests and saves it. */
 	async function handleAiDraft() {
-		if (!sample.trim()) return;
+		if (!sample.trim() || !draft) return;
+		const session = draftSession;
 		drafting = true;
 		formError = '';
 		aiNote = null;
 		test = null;
 		try {
 			const out = await draftTemplateAi({ text: sample });
+			if (session !== draftSession || !draft) return; // user opened another template or closed it
 			draft = {
-				id: draft?.id,
+				id: draft.id, // same session, so this is still the same template (a save may have given it an id)
 				name: out.template.name,
 				bankId: out.template.bankId,
 				domains: out.template.fromDomains.join(', '),
 				subjectRegex: out.template.subjectRegex,
 				fields: { ...out.template.fields },
-				enabled: draft?.enabled ?? true
+				enabled: draft.enabled
 			};
 			aiNote = out.problems.length
 				? {
@@ -94,9 +98,11 @@
 						text: `${out.providerLabel} drafted a template and it reads the sample correctly. Review each field, press Test, then save.`
 					};
 		} catch (err) {
-			formError = err instanceof Error ? err.message : 'Could not draft a template';
+			if (session === draftSession) {
+				formError = err instanceof Error ? err.message : 'Could not draft a template';
+			}
 		} finally {
-			drafting = false;
+			if (session === draftSession) drafting = false;
 		}
 	}
 
@@ -150,6 +156,8 @@
 	}
 
 	function resetMessages() {
+		draftSession++; // drops a running AI draft for the previous template
+		drafting = false;
 		formError = '';
 		savedNote = '';
 		confirmDelete = false;
@@ -348,7 +356,7 @@
 						id="sample"
 						class="textarea block min-h-32 w-full font-mono text-xs"
 						placeholder="Paste a real alert from your bank to test the template"
-						maxlength={100000}
+						maxlength={20000}
 						bind:value={sample}
 					></textarea>
 					<div class="flex flex-wrap items-center gap-2">

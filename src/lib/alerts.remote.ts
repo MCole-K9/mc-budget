@@ -4,7 +4,7 @@ import { query, command } from '$app/server';
 import type PocketBase from 'pocketbase';
 import type { RecordModel } from 'pocketbase';
 import { getPb } from '$lib/server/db';
-import { dedupeHash, toTemplate } from '$lib/server/alerts';
+import { dedupeHash, parsedFields, toTemplate, withLock } from '$lib/server/alerts';
 import {
 	draftTemplateWithAi,
 	readAlertWithAi,
@@ -13,7 +13,6 @@ import {
 } from '$lib/server/alertAi';
 import { getUserSetting, setUserSetting } from '$lib/server/userSettings';
 import {
-	MAX_INPUT_CHARS,
 	TEMPLATE_FIELDS,
 	applyTemplate,
 	capture,
@@ -30,10 +29,15 @@ import { WalletSchema } from '$lib/schemas/budget';
 import { getWallet } from '$lib/wallets.remote';
 import { getTransactions } from '$lib/transactions.remote';
 
-const MAX_TEMPLATES = 50;
+// Parse budget: every parse runs each enabled template (up to 8 RE2 regexes) over the text, synchronously.
+// Bank alerts are short, so 20,000 chars x 20 templates x 10 parses/min keeps one user from stalling the server.
+const MAX_PASTE_CHARS = 20_000;
+const MAX_TEMPLATES = 20;
 const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_PARSES = 30;
+const RATE_LIMIT_PARSES = 10;
 const parseRateState = new Map<string, number[]>();
+const RATE_LIMIT_TESTS = 30;
+const testRateState = new Map<string, number[]>();
 const RATE_LIMIT_AI_DRAFTS = 5;
 const aiRateState = new Map<string, number[]>();
 
@@ -112,7 +116,7 @@ async function readAlert(
 	}
 }
 
-/** Parses scan up to 100 KB with every template, so cap how often a user can start one. */
+/** A parse runs every template over up to MAX_PASTE_CHARS, so cap how often a user can start one. */
 function enforceParseRateLimit(userId: string): void {
 	enforceRateLimit(
 		parseRateState,
@@ -124,32 +128,18 @@ function enforceParseRateLimit(userId: string): void {
 
 const isoDate = (value: unknown) => String(value ?? '').replace(' ', 'T');
 
+/** Enabled templates, oldest first. Never more than MAX_TEMPLATES, which bounds the work per parse. */
 async function loadTemplates(pb: PocketBase): Promise<ParserTemplate[]> {
-	const records = await pb.collection('parser_templates').getFullList({
+	const records = await pb.collection('parser_templates').getList(1, MAX_TEMPLATES, {
 		filter: 'enabled = true',
 		sort: 'created',
 		requestKey: null
 	});
-	return records.map((r) => toTemplate(r as unknown as Parameters<typeof toTemplate>[0]));
+	return records.items.map((r) => toTemplate(r as unknown as Parameters<typeof toTemplate>[0]));
 }
 
 function pasteInput(text: string): AlertInput {
 	return { channel: 'paste', text, receivedAt: new Date().toISOString(), senderVerified: false };
-}
-
-function parsedFields(p: ParsedAlert) {
-	return {
-		bank_id: p.bankId,
-		direction: p.direction,
-		amount: p.amount,
-		currency: p.currency,
-		merchant: p.merchant ?? '',
-		account_hint: p.accountHint ?? '',
-		occurred_at: p.occurredAt,
-		reference: p.reference ?? '',
-		parser: p.parser,
-		confidence: p.confidence
-	};
 }
 
 function toAlertView(r: RecordModel, links: Map<string, string>): AlertView {
@@ -190,7 +180,11 @@ async function findDuplicate(pb: PocketBase, hash: string): Promise<string | nul
 // ---- Alerts -------------------------------------------------------------------------------
 
 const AlertTextSchema = z.object({
-	text: z.string().trim().min(1, 'Paste the alert text').max(MAX_INPUT_CHARS, 'Alert is too long')
+	text: z
+		.string()
+		.trim()
+		.min(1, 'Paste the alert text')
+		.max(MAX_PASTE_CHARS, 'Alert is too long (max 20,000 characters)')
 });
 
 /** Parses pasted text without saving it. */
@@ -286,45 +280,70 @@ const ConfirmAlertSchema = z.object({
 export const confirmAlert = command(ConfirmAlertSchema, async (input) => {
 	const userId = requireUserId();
 	const pb = getPb();
-	// Owner-only rules: another user's alert or wallet id gives 404 here
-	const alert = await pb.collection('alerts').getOne(input.id, { requestKey: null });
-	if (alert.status !== 'pending') error(409, 'This alert was already handled');
-	if (alert.direction === 'declined') {
-		error(400, 'A declined payment moved no money. Ignore it instead.');
-	}
-	const wallet = WalletSchema.parse(
-		await pb.collection('wallets').getOne(input.walletId, { requestKey: null })
+
+	// Same alert twice (two tabs, a retry) or two alerts into one wallet at once: run one after the
+	// other, and read the alert status and wallet balance only inside the locks.
+	const { alert, wallet } = await withLock(`alert:${input.id}`, () =>
+		withLock(`wallet:${input.walletId}`, async () => {
+			// Owner-only rules: another user's alert or wallet id gives 404 here
+			const alert = await pb.collection('alerts').getOne(input.id, { requestKey: null });
+			if (alert.status !== 'pending') error(409, 'This alert was already handled');
+			if (alert.direction === 'declined') {
+				error(400, 'A declined payment moved no money. Ignore it instead.');
+			}
+			const wallet = WalletSchema.parse(
+				await pb.collection('wallets').getOne(input.walletId, { requestKey: null })
+			);
+
+			const category = input.isExpense ? input.category : input.category || 'Income';
+			const known = wallet.categories.some((c) => c.name.toLowerCase() === category.toLowerCase());
+			if (input.isExpense && !known) {
+				error(400, `Category "${category}" does not exist in ${wallet.name}`);
+			}
+			const amount = input.isExpense ? -input.amount : input.amount;
+
+			await pb.collection('alerts').update(alert.id, { status: 'confirmed' });
+			let transactionId = '';
+			try {
+				const tx = await pb.collection('transactions').create({
+					wallet: wallet.id,
+					category,
+					amount,
+					description: input.description,
+					date: input.date,
+					source: 'alert'
+				});
+				transactionId = tx.id;
+				await pb.collection('wallets').update(wallet.id, {
+					balance: wallet.balance + amount,
+					...(amount > 0 && { total_funded: wallet.total_funded + amount })
+				});
+			} catch (err) {
+				// Undo, so a retry cannot leave two transactions behind. If the transaction cannot be
+				// removed, keep the alert confirmed and linked to it, so a retry is impossible.
+				const removed =
+					!transactionId ||
+					(await pb
+						.collection('transactions')
+						.delete(transactionId)
+						.then(() => true)
+						.catch(() => false));
+				if (!removed) {
+					await pb
+						.collection('alerts')
+						.update(alert.id, { transaction: transactionId, raw_text: '' });
+					error(
+						500,
+						`The transaction was added, but ${wallet.name}'s balance was not updated. Use "Recalculate balance" on the wallet.`
+					);
+				}
+				await pb.collection('alerts').update(alert.id, { status: 'pending' });
+				throw err;
+			}
+			await pb.collection('alerts').update(alert.id, { transaction: transactionId, raw_text: '' });
+			return { alert, wallet };
+		})
 	);
-
-	const category = input.isExpense ? input.category : input.category || 'Income';
-	const known = wallet.categories.some((c) => c.name.toLowerCase() === category.toLowerCase());
-	if (input.isExpense && !known) {
-		error(400, `Category "${category}" does not exist in ${wallet.name}`);
-	}
-	const amount = input.isExpense ? -input.amount : input.amount;
-
-	// Claim the alert first so a double click cannot create two transactions
-	await pb.collection('alerts').update(alert.id, { status: 'confirmed' });
-	let transactionId: string;
-	try {
-		const tx = await pb.collection('transactions').create({
-			wallet: wallet.id,
-			category,
-			amount,
-			description: input.description,
-			date: input.date,
-			source: 'alert'
-		});
-		transactionId = tx.id;
-		await pb.collection('wallets').update(wallet.id, {
-			balance: wallet.balance + amount,
-			...(amount > 0 && { total_funded: wallet.total_funded + amount })
-		});
-	} catch (err) {
-		await pb.collection('alerts').update(alert.id, { status: 'pending' });
-		throw err;
-	}
-	await pb.collection('alerts').update(alert.id, { transaction: transactionId, raw_text: '' });
 
 	if (input.rememberWallet && alert.bank_id && alert.account_hint) {
 		const existing = await pb.collection('account_links').getList(1, 1, {
@@ -347,16 +366,19 @@ export const confirmAlert = command(ConfirmAlertSchema, async (input) => {
 	refreshAlertLists();
 	getTransactions(wallet.id).refresh();
 	getWallet(wallet.id).refresh();
-	return { transactionId };
+	return { success: true };
 });
 
 /** Dismisses an alert without a transaction and drops its raw text. */
 export const ignoreAlert = command(z.string().min(1), async (id) => {
 	requireUserId();
 	const pb = getPb();
-	const alert = await pb.collection('alerts').getOne(id, { requestKey: null });
-	if (alert.status === 'confirmed') error(409, 'This alert is already a transaction');
-	await pb.collection('alerts').update(id, { status: 'ignored', raw_text: '' });
+	// Same lock as confirmAlert, so an ignore cannot overwrite a confirm that is running
+	await withLock(`alert:${id}`, async () => {
+		const alert = await pb.collection('alerts').getOne(id, { requestKey: null });
+		if (alert.status === 'confirmed') error(409, 'This alert is already a transaction');
+		await pb.collection('alerts').update(id, { status: 'ignored', raw_text: '' });
+	});
 	refreshAlertLists();
 	return { success: true };
 });
@@ -366,35 +388,37 @@ export const reparseAlert = command(z.string().min(1), async (id) => {
 	const userId = requireUserId();
 	enforceParseRateLimit(userId);
 	const pb = getPb();
-	const alert = await pb.collection('alerts').getOne(id, { requestKey: null });
-	if (alert.status !== 'failed' || !alert.raw_text) {
-		error(409, 'Only unread alerts can be tried again');
-	}
+	const status = await withLock(`alert:${id}`, async () => {
+		const alert = await pb.collection('alerts').getOne(id, { requestKey: null });
+		if (alert.status !== 'failed' || !alert.raw_text) {
+			error(409, 'Only unread alerts can be tried again');
+		}
 
-	const templates = await loadTemplates(pb);
-	const input: AlertInput = {
-		channel: alert.channel,
-		text: alert.raw_text,
-		receivedAt: isoDate(alert.received_at),
-		senderVerified: false
-	};
-	const parsed = await readAlert(userId, input, templates);
-	if (!parsed) return { status: 'failed' as const };
+		const templates = await loadTemplates(pb);
+		const input: AlertInput = {
+			channel: alert.channel,
+			text: alert.raw_text,
+			receivedAt: isoDate(alert.received_at),
+			senderVerified: false
+		};
+		const parsed = await readAlert(userId, input, templates);
+		if (!parsed) return 'failed' as const;
 
-	const hash = dedupeHash(userId, parsed);
-	if (await findDuplicate(pb, hash)) {
-		await pb.collection('alerts').update(id, { status: 'ignored', raw_text: '' });
-		refreshAlertLists();
-		return { status: 'duplicate' as const };
-	}
-	await pb.collection('alerts').update(id, {
-		status: 'pending',
-		raw_text: '',
-		dedupe_hash: hash,
-		...parsedFields(parsed)
+		const hash = dedupeHash(userId, parsed);
+		if (await findDuplicate(pb, hash)) {
+			await pb.collection('alerts').update(id, { status: 'ignored', raw_text: '' });
+			return 'duplicate' as const;
+		}
+		await pb.collection('alerts').update(id, {
+			status: 'pending',
+			raw_text: '',
+			dedupe_hash: hash,
+			...parsedFields(parsed)
+		});
+		return 'pending' as const;
 	});
 	refreshAlertLists();
-	return { status: 'pending' as const };
+	return { status };
 });
 
 // ---- Parser templates ---------------------------------------------------------------------
@@ -477,13 +501,16 @@ export const saveTemplate = command(
 		if (id) {
 			record = await pb.collection('parser_templates').update(id, data);
 		} else {
-			const existing = await pb
-				.collection('parser_templates')
-				.getList(1, 1, { fields: 'id', requestKey: null });
-			if (existing.totalItems >= MAX_TEMPLATES) {
-				error(400, `You can have up to ${MAX_TEMPLATES} templates`);
-			}
-			record = await pb.collection('parser_templates').create(data);
+			// Count and create under one lock, so parallel saves cannot pass the limit together
+			record = await withLock(`templates:${userId}`, async () => {
+				const existing = await pb
+					.collection('parser_templates')
+					.getList(1, 1, { fields: 'id', requestKey: null });
+				if (existing.totalItems >= MAX_TEMPLATES) {
+					error(400, `You can have up to ${MAX_TEMPLATES} templates`);
+				}
+				return pb.collection('parser_templates').create(data);
+			});
 		}
 		getTemplates().refresh();
 		return toTemplateView(record);
@@ -499,7 +526,7 @@ export const deleteTemplate = command(z.string().min(1), async (id) => {
 
 const TestTemplateSchema = z.object({
 	template: TemplateInputSchema,
-	text: z.string().min(1, 'Paste a sample alert').max(MAX_INPUT_CHARS)
+	text: z.string().min(1, 'Paste a sample alert').max(MAX_PASTE_CHARS)
 });
 
 type FieldCaptures = Record<(typeof TEMPLATE_FIELDS)[number], string | null>;
@@ -507,7 +534,13 @@ type FieldCaptures = Record<(typeof TEMPLATE_FIELDS)[number], string | null>;
 /** Runs a draft template on a sample: what each field captured, and the final result. Saves nothing. */
 export const testTemplate = command(TestTemplateSchema, async ({ template, text }) => {
 	const userId = requireUserId();
-	enforceParseRateLimit(userId);
+	// One template per test (not all of them), so editing gets a looser budget than parsing
+	enforceRateLimit(
+		testRateState,
+		userId,
+		RATE_LIMIT_TESTS,
+		'Too many tests at once. Please wait a minute and try again.'
+	);
 	const tpl = draftTemplate(template);
 	const problems = templateProblems(tpl);
 	if (problems.length) {
@@ -557,7 +590,7 @@ export const setAlertAiFallback = command(z.boolean(), async (enabled) => {
  * alert. Saves nothing: the editor shows the draft for review.
  */
 export const draftTemplateAi = command(
-	z.object({ text: z.string().trim().min(1, 'Paste a sample alert').max(MAX_INPUT_CHARS) }),
+	z.object({ text: z.string().trim().min(1, 'Paste a sample alert').max(MAX_PASTE_CHARS) }),
 	async ({ text }) => {
 		const userId = requireUserId();
 		enforceRateLimit(

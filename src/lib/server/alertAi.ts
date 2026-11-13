@@ -120,6 +120,10 @@ export function checkDraft(alert: AlertInput, tpl: ParserTemplate, expected: Exp
 	if (result.direction !== expected.direction) {
 		out.push(`type: found ${result.direction}, the alert says ${expected.direction}`);
 	}
+	const plain = (s = '') => s.replace(/\s+/g, ' ').trim().toLowerCase();
+	if (plain(expected.merchant) && plain(result.merchant) !== plain(expected.merchant)) {
+		out.push(`merchant: found "${result.merchant ?? ''}", the alert says "${expected.merchant}"`);
+	}
 	return out;
 }
 
