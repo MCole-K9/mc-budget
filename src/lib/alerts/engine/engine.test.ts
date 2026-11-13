@@ -426,6 +426,9 @@ describe('providerForEmail', () => {
 });
 
 describe('package boundary', () => {
+	// The engine may depend on npm packages listed here, never on app code ($lib, $app, …)
+	const ALLOWED_PACKAGES = ['re2js'];
+
 	it('imports nothing from outside the engine folder', () => {
 		const files = ['', 'fixtures']
 			.flatMap((dir) => readdirSync(join(__dirname, dir)).map((f) => join(dir, f)))
@@ -437,6 +440,7 @@ describe('package boundary', () => {
 				...source.matchAll(/(?<![\w'"])(?:from|import)\s*\(?\s*['"]([^'"]+)['"]/g)
 			].map((m) => m[1]);
 			for (const spec of specifiers) {
+				if (ALLOWED_PACKAGES.includes(spec)) continue;
 				const target = resolve(dirname(join(__dirname, file)), spec);
 				expect(
 					spec.startsWith('.') && target.startsWith(__dirname + sep),

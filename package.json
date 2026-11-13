@@ -51,6 +51,7 @@
 		"chart.js": "^4.5.1",
 		"daisyui": "5",
 		"pocketbase": "^0.26.8",
+		"re2js": "^2.10.0",
 		"zod": "4"
 	}
 }

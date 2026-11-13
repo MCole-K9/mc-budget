@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { getAllTransactionsPaged, getAllTransactionsSummary } from '$lib/transactions.remote';
+	import { getPendingAlertCount } from '$lib/alerts.remote';
+	import Button from '$lib/components/Button.svelte';
 	import { getStandardPeriodRange } from '$lib/utils/dateRange';
 	import AuthGuard from '$lib/components/AuthGuard.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
@@ -34,10 +36,11 @@
 
 	const dateRange = $derived(getDateRange(selectedPeriod));
 
-	const [pagedResult, summary] = $derived(
+	const [pagedResult, summary, pendingAlerts] = $derived(
 		await Promise.all([
 			getAllTransactionsPaged({ page: currentPage, perPage: PER_PAGE, ...dateRange }),
-			getAllTransactionsSummary(dateRange)
+			getAllTransactionsSummary(dateRange),
+			getPendingAlertCount()
 		])
 	);
 
@@ -52,6 +55,18 @@
 	<PageHeader title="Transactions" subtitle="Everything across all of your wallets." />
 
 	<div class="space-y-6">
+		{#if pendingAlerts > 0}
+			<div
+				class="flex flex-wrap items-center justify-between gap-3 rounded-box border border-primary/30 bg-primary/5 p-4"
+			>
+				<p class="text-sm">
+					<span class="font-semibold">{pendingAlerts} pending</span>
+					{pendingAlerts === 1 ? 'transaction' : 'transactions'} from bank alerts to review.
+				</p>
+				<Button href={resolve('/alerts')} size="sm" icon="inbox">Review</Button>
+			</div>
+		{/if}
+
 		<PeriodFilter
 			periods={PERIODS}
 			value={selectedPeriod}

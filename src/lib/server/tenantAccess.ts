@@ -52,6 +52,28 @@ const tenantCollectionRules = {
 		createRule: '@request.auth.id = wallet.user.id && @request.auth.id = source_wallet.user.id',
 		updateRule: `@request.auth.id = wallet.user.id && ${keepsWallet} && ${keepsSourceWallet}`,
 		deleteRule: '@request.auth.id = wallet.user.id'
+	},
+	// Keep in sync with pb_migrations/13_bank_alerts.js
+	parser_templates: {
+		listRule: '@request.auth.id = user.id',
+		viewRule: '@request.auth.id = user.id',
+		createRule: ownerCreate,
+		updateRule: `@request.auth.id = user.id && ${keepsOwner}`,
+		deleteRule: '@request.auth.id = user.id'
+	},
+	alerts: {
+		listRule: '@request.auth.id = user.id',
+		viewRule: '@request.auth.id = user.id',
+		createRule: ownerCreate,
+		updateRule: `@request.auth.id = user.id && ${keepsOwner}`,
+		deleteRule: '@request.auth.id = user.id'
+	},
+	account_links: {
+		listRule: '@request.auth.id = user.id',
+		viewRule: '@request.auth.id = user.id',
+		createRule: `${ownerCreate} && @request.body.wallet.user = @request.auth.id`,
+		updateRule: `@request.auth.id = user.id && ${keepsOwner} && ${keepsWallet}`,
+		deleteRule: '@request.auth.id = user.id'
 	}
 };
 

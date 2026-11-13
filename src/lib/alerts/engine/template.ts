@@ -1,12 +1,11 @@
 import type { AlertInput, ParsedAlert, ParserTemplate } from './types';
 import { normalizeAmount, normalizeCurrency, normalizeDate, normalizeDirection } from './normalize';
 import { emailAddress } from './unwrap';
+import { compileTemplateRegex, templateProblems } from './validate';
 
-// ReDoS limits: cap both sides of every regex run. Caps reduce but do not prevent catastrophic
-// backtracking (e.g. `(a+)+$`), so templates must be trusted (reviewed by us), not user-written.
+// Template regexes run on RE2 (linear time, see validate.ts); these caps bound the input size.
 export const MAX_INPUT_CHARS = 100_000;
 const MAX_HEADER_CHARS = 1_000;
-const MAX_REGEX_CHARS = 500;
 
 /** True when any input field is too large to run regexes on. */
 export function exceedsLimits(input: AlertInput): boolean {
@@ -23,22 +22,22 @@ function confidenceFor(input: AlertInput): ParsedAlert['confidence'] {
 	return input.senderVerified && input.channel === 'auto-forward' && input.from ? 'high' : 'low';
 }
 
-function compile(source: string): RegExp | null {
+function compile(source: string) {
 	try {
-		return new RegExp(source, 'im');
+		return compileTemplateRegex(source);
 	} catch {
 		return null;
 	}
 }
 
 /** Capture group 1 (or the whole match) of the field regex, whitespace collapsed. Empty source = unused field. */
-function capture(text: string, source: string): string | undefined {
+export function capture(text: string, source: string): string | undefined {
 	if (!source) return undefined;
 	const m = compile(source)?.exec(text);
 	return (m?.[1] ?? m?.[0])?.replace(/\s+/g, ' ').trim() || undefined;
 }
 
-function senderMatches(input: AlertInput, tpl: ParserTemplate): boolean {
+export function senderMatches(input: AlertInput, tpl: ParserTemplate): boolean {
 	// Pasted or shared text has no sender: the field regexes alone decide.
 	if (!input.from) return true;
 	const domain = emailAddress(input.from)?.split('@')[1];
@@ -57,8 +56,7 @@ function senderMatches(input: AlertInput, tpl: ParserTemplate): boolean {
 export function applyTemplate(input: AlertInput, tpl: ParserTemplate): ParsedAlert | null {
 	const text = input.text;
 	if (exceedsLimits(input)) return null;
-	const sources = [...Object.values(tpl.fields), tpl.match.subjectRegex ?? ''];
-	if (sources.some((s) => s.length > MAX_REGEX_CHARS)) return null;
+	if (templateProblems(tpl).length) return null;
 	if (!senderMatches(input, tpl)) return null;
 
 	const field = (key: keyof ParserTemplate['fields']) => capture(text, tpl.fields[key]);

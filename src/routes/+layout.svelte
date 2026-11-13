@@ -32,6 +32,7 @@
 	];
 
 	const secondaryNav: NavItem[] = [
+		{ href: resolve('/alerts'), label: 'Bank alerts', short: 'Alerts', icon: 'inbox' },
 		{ href: resolve('/presets'), label: 'Budget presets', short: 'Presets', icon: 'layers' },
 		{ href: resolve('/settings'), label: 'Settings', short: 'Settings', icon: 'settings' }
 	];

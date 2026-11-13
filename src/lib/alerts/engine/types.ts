@@ -28,8 +28,9 @@ export interface ParsedAlert {
 }
 
 /**
- * Each field is a regex source, run case-insensitive and multiline (`im`); capture group 1 is the value.
- * An empty string means "not used". Templates must be trusted: see the ReDoS note in template.ts.
+ * Each field is an RE2 regex source, run case-insensitive and multiline; capture group 1 is the value.
+ * An empty string means "not used". RE2 matches in linear time, so users can write templates safely;
+ * it has no backreferences or lookaheads (see validate.ts).
  * Currency must appear in the alert (field or amount text); a bank that prints only a bare `$` cannot be
  * parsed yet. Supporting it needs a contract change (e.g. a `defaultCurrency` field), not a smarter regex.
  */
